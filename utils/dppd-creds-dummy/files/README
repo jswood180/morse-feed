@@ -1,0 +1,13 @@
+This folder contains sample configuration and key material for the purposes
+of TESTING ONLY
+
+make-ca.sh will regenerate the CA. Note that doing so means the mobile app
+will need to be rebuilt with the new CA. And the ca.cer file placed in
+app/android/app/src/main/assets/ca_out.cer, this will also be picked up by the
+iOS builds.
+
+sign-cert.sh will create a signed server certificate for the current machine.
+Have a look inside this script if you want to generate a certificate for
+another machine. You will need to output of this script, <hostname>.pem and
+<hostname>.key to the dppd server. For convenience the script also symlinks
+server.pem and server.key to the key pair it last generated.
