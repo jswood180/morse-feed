@@ -18,12 +18,14 @@ else
 	suffix="z$(tr -dc 'a-f0-9' </dev/urandom | head -c 3)"
 fi
 
-prefix="$DEVICE_PRODUCT"
-if [ -z "$prefix" ]; then
-	prefix="morse"
+if [ -n "${DEVICE_PRODUCT}" ] && [ "$DEVICE_PRODUCT" != Generic ]; then
+	prefix="${DEVICE_PRODUCT}"
+else
+	# Model without manufacturer (i.e. strip MorseMicro) and revision.
+	prefix="$(sed "s/$DEVICE_MANUFACTURER //;s/ *[v-][0-9]*$//" /tmp/sysinfo/model)"
 fi
 
-ucidef_set_hostname "$(echo "$prefix-$suffix" | tr A-Z a-z | tr -d ' ')"
+ucidef_set_hostname "$(echo "$prefix-$suffix" | tr A-Z a-z | tr -c -d 'A-Za-z0-9_-')"
 
 board_config_flush
 

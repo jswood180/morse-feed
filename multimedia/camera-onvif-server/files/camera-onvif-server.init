@@ -94,11 +94,11 @@ start_instance() {
 start_service() {
 	. /etc/device_info
 	MANUFACTURER="${DEVICE_MANUFACTURER}"
-	if [ -n "${DEVICE_PRODUCT}" ]; then
-		MODEL="${DEVICE_PRODUCT}${DEVICE_REVISION}"
+	if [ -n "${DEVICE_PRODUCT}" ] && [ "$DEVICE_PRODUCT" != Generic ]; then
+		MODEL="${DEVICE_PRODUCT}"
 	else
 		MODEL="$(cat /tmp/sysinfo/model)"
-		MODEL="${MODEL#$MANUFACTURER}"
+		MODEL="${MODEL#$MANUFACTURER }"
 	fi
 	FW_VERSION="$(cat /etc/openwrt_version)"
 
