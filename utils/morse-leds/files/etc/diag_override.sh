@@ -40,13 +40,20 @@ green="0 255 0"
 blue="0 0 127"
 yellow="255 255 0"
 cyan="0 255 127"
-magenta="255 0 127"
+light_purple="255 0 127"
+dark_purple="64 0 128"
 
 led_set_color() {
 	# input is <led> <R G B>, The assumption here is that
 	# /sys/class/leds/$1/multi_index is always "red green blue". And that
 	# /sys/class/leds/$1/max_brightness is always 255
 	led_set_attr "$1" multi_intensity "$2"
+}
+
+disable_all_leds() {
+	led_off "$halow"
+	led_off "$wifi"
+	led_off "$status"
 }
 
 led_blink_slow() {
@@ -68,7 +75,7 @@ led_blink_veryfast() {
 set_leds_normal() {
 	# This sets the color of all leds and the blink pattern on status only.
 	# The blink pattern of the other leds is controlled by /etc/init.d/led
-	led_set_color "$halow" "$magenta"
+	led_set_color "$halow" "$light_purple"
 	led_set_color "$wifi" "$green"
 	led_set_color "$status" "$green"
 	if [ "$_mm_mode" = sta ]; then
@@ -90,22 +97,24 @@ set_state() {
 		led_blink_fast "$status"
 		;;
 	failsafe)
+		disable_all_leds
 		led_set_color "$status" "$red"
 		led_blink_veryfast "$status"
 		;;
 	upgrade)
+		disable_all_leds
 		led_set_color "$status" "$blue"
 		led_blink "$status"
 		;;
 	dpp_started)
-		led_set_color "$status" "$red"
-		led_blink_slow "$status"
+		led_set_color "$halow" "$dark_purple"
+		led_blink_slow "$halow"
 		;;
 	dpp_failed)
-		led_set_color "$status" "$red"
-		led_blink_fast "$status"
+		led_off "$halow"
 		;;
 	factory_reset)
+		disable_all_leds
 		led_set_color "$status" "$yellow"
 		led_blink "$status"
 		;;
@@ -120,7 +129,10 @@ set_state() {
 		led_blink_fast "$status"
 		;;
 	done)
+		# This state is called both after boot completes and after a DPP session finishes.
 		set_leds_normal
+		# DPP overrides the normal halow led trigger, so restore it here by calling the led script.
+		/etc/init.d/led restart
 		;;
 	esac
 }
