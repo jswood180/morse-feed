@@ -1025,6 +1025,15 @@ return view.extend({
 				uci.unload(['wireless', 'network', 'firewall', 'dhcp', 'luci', 'system', 'prplmesh', 'mesh11sd']);
 				repeatLoadData = await this.repeatLoad();
 			}
+
+			// Save textbox cursor position so we can restore after re-render.
+			const view = document.getElementById('view');
+			const activeElement = document.activeElement;
+			let textboxCursorPosition;
+			if (activeElement && activeElement.tagName === 'INPUT' && ['text', 'password'].includes(activeElement.type)) {
+				textboxCursorPosition = activeElement.selectionStart;
+			}
+
 			const cards = await this.createCards({ ...onceLoadData, ...repeatLoadData });
 			// i.e. force us to regen next time through the poll.
 			repeatLoadData = null;
@@ -1039,8 +1048,13 @@ return view.extend({
 				}
 			}
 
-			const view = document.getElementById('view');
 			view.replaceChildren(E('div', { class: 'cards' }, cards.map(c => c.renderCard())));
+
+			// Restore textboxCursorPosition
+			if (textboxCursorPosition && document.contains(activeElement)) {
+				activeElement.focus();
+				activeElement.setSelectionRange(textboxCursorPosition, textboxCursorPosition);
+			}
 		});
 
 		document.getElementById('maincontent').append(
