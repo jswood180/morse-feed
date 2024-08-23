@@ -163,6 +163,7 @@ function readSectionInfo() {
 	const morseMeshApInterfaceName = `meshap_${morseDeviceName}`;
 	const wifiApInterfaceName = `default_${wifiDeviceName}`;
 	const wifiStaInterfaceName = `sta_${wifiDeviceName}`;
+	const morseMeshInterfaceName = `mesh_${morseDeviceName}`;
 
 	// privlan has been removed from all the configs, but for those upgrading we should prefer the IP address
 	// in privlan (i.e. likely 10.42.0.1) to that in lan (likely 192.168.1.1).
@@ -195,6 +196,7 @@ function readSectionInfo() {
 		wifiDevice,
 		wifiDeviceName,
 		morseInterfaceName,
+		morseMeshInterfaceName,
 		morseBackhaulStaName,
 		morseMeshApInterfaceName,
 		wifiApInterfaceName,

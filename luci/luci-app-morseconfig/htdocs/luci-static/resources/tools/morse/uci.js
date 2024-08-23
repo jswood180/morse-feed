@@ -15,6 +15,43 @@ function getZoneForNetwork(network) {
 	return zoneSection?.['.name'];
 }
 
+// Use F2 as prefix so that we know it's generated via this process (see below).
+function getRandomMAC() {
+	return 'F2:' + Array.from({ length: 5 }, () =>
+		Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join(':');
+}
+
+// This is used to generate a Bridge MAC address that's related to the MAC address on the HaLow module.
+// This is particularly useful for prplmesh as a janky way of aligning MACs visible at
+// different points.
+// Use F2 as prefix so that we know it's generated via this process. Originally F2 was chosen to
+// stay away from OpenWrt's method of auto-generating addresses if you started as 0c (the first octet
+// of the Morse OUI) which it does if there are multiple wifi interfaces on the same radio.
+//   i.e. 0c, 0e, ... , F2
+// TODO - now this doesn't make sense: APP-3325
+function getFakeMorseMAC(networkDevices) {
+	for (const d of networkDevices) {
+		if (d.getWifiNetwork() && d.getWifiNetwork().ubus('dev', 'iwinfo', 'hwmodes')?.includes('ah')) {
+			if (d.getMAC()) {
+				return 'F2:' + d.getMAC().slice(-14);
+			}
+		}
+	}
+
+	return null;
+}
+
+function getDefaultSSID() {
+	return uci.get_first('system', 'system', 'hostname');
+}
+
+function getDefaultWifiKey() {
+	const CHARS = 'abcdefghijklmnopqrstuvwxyz023456789';
+
+	return uci.get_first('system', 'system', 'default_wifi_key') ?? Array.from({ length: 8 },
+		() => CHARS.charAt(Math.floor(Math.random() * CHARS.length)));
+}
+
 function getOrCreateForwarding(srcZone, destZone, name = undefined) {
 	// The code subsequent to this messes with firewall rules. However, if the
 	// user hasn't changed what's in uci at all, we want to be able to issue
@@ -361,4 +398,8 @@ return baseclass.extend({
 	getOrCreateForwarding,
 	setupNetworkWithDnsmasq,
 	ensureNetworkExists,
+	getDefaultSSID,
+	getDefaultWifiKey,
+	getRandomMAC,
+	getFakeMorseMAC,
 });

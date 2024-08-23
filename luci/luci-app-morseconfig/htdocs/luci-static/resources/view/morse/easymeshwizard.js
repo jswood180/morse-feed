@@ -10,8 +10,7 @@
 
 return wizard.AbstractWizardView.extend({
 	__init__(/* ... */) {
-		this.randomMacSuffix = Array.from({ length: 5 }, () =>
-			Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join(':');
+		this.randomMac = morseuci.getRandomMAC();
 
 		return this.super('__init__', this.varargs(arguments, 1,
 			_('EasyMesh Wizard'),
@@ -140,19 +139,12 @@ return wizard.AbstractWizardView.extend({
 		morseuci.ensureNetworkExists('lan');
 		morseuci.ensureNetworkExists('ahwlan');
 
-		// Set bridge MAC for prplmesh
+		// Get bridge MAC for prplmesh.
 		// Find if the morseInterface has a valid MAC and use it with Morse OUI
 		// This would provide a relatable representation of the fronthaul and backhaul
 		// interfaces in the topology viewer. If there is no MAC address available, use a
 		// random MAC suffix with the Morse OUI.
-		let bridgeMAC;
-		const netDev = (this.netDevices).find(device => device.getWifiNetwork()
-			&& device.getWifiNetwork().sid === morseInterfaceName);
-		if (netDev?.getMAC()) {
-			bridgeMAC = 'F2:' + netDev.getMAC().slice(-14);
-		} else {
-			bridgeMAC = 'F2:' + this.randomMacSuffix;
-		}
+		let bridgeMAC = morseuci.getFakeMorseMAC(this.netDevices) ?? morseuci.getRandomMAC();
 
 		let isController = uci.get('prplmesh', 'config', 'master') === '1';
 
