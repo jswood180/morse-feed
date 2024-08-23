@@ -20,10 +20,12 @@ get_key_from_persistent_storage()
 
 print_usage()
 {
-    echo "persistent_vars_storage.sh OPERATION(READ|WRITE|ERASE) KEY [VALUE]" 1>&2;
+    echo "persistent_vars_storage.sh OPERATION(READ|READALL|WRITE|ERASE) KEY [VALUE]" 1>&2;
 }
 
-
+all_keys="device_password default_wifi_key dpp_priv_key mm_region
+    mm_virtual_wire mm_mode dropbear_authorized_keys dropbear_ed25519_host_key
+    dropbear_rsa_host_key"
 
 case "$operation" in
     READ)
@@ -38,6 +40,12 @@ case "$operation" in
         fi
     ;;
 
+    READALL)
+        for key in $all_keys; do
+            printf '%s=%s\n' "$key" "$($0 READ "$key")"
+        done
+    ;;
+
     WRITE|ERASE)
         echo "Writing to persistent memory isn't implemented on bcm2711, yet." 1>&2;
         exit 1
@@ -49,5 +57,3 @@ case "$operation" in
     ;;
 
 esac
-
-

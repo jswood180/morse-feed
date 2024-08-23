@@ -9,7 +9,7 @@ trap exit_handler EXIT
 exit_handler()
 {
 	if [ "$?" -ne 0 ]; then
-		echo "Usage: $0 OPERATION(READ|WRITE|ERASE) KEY [VALUE]" 1>&2
+		echo "Usage: $0 OPERATION(READ|READALL|WRITE|ERASE) KEY [VALUE]" 1>&2
 		exit 1
 	fi
 }
@@ -82,6 +82,10 @@ fi
 operation="$1"
 key="$2"
 
+all_keys="device_password default_wifi_key dpp_priv_key mm_region
+	mm_virtual_wire mm_mode dropbear_authorized_keys dropbear_ed25519_host_key
+	dropbear_rsa_host_key"
+
 case "$operation" in
 	READ)
 		if ! fw_printenv -n -c "$conffile" "$key" 2> /dev/null; then
@@ -89,6 +93,12 @@ case "$operation" in
 			# defaults for the device (if available).
 			show_factory_data "$2"
 		fi
+	;;
+
+	READALL)
+		for key in $all_keys; do
+			printf '%s=%s\n' "$key" "$($0 READ "$key")"
+		done
 	;;
 
 	WRITE)
