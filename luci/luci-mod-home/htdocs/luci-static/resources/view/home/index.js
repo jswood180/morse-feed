@@ -99,6 +99,35 @@ function makeClass(n) {
 	return n.getName().replace(/[^\w-]/g, '-');
 }
 
+// These are extracted from LuCI's view/network/wireless.js.
+const ENCRYPTION_OPTIONS = {
+	'psk2': 'WPA2-PSK',
+	'psk-mixed': 'WPA-PSK/WPA2-PSK Mixed Mode',
+	'psk': 'WPA-PSK',
+	'sae': 'WPA3-SAE',
+	'sae-mixed': 'WPA2-PSK/WPA3-SAE Mixed Mode',
+	'wep-open': _('WEP Open System'),
+	'wep-shared': _('WEP Shared Key'),
+	'wpa3': 'WPA3-EAP',
+	'wpa3-mixed': 'WPA2-EAP/WPA3-EAP Mixed Mode',
+	'wpa2': 'WPA2-EAP',
+	'wpa': 'WPA-EAP',
+	'owe': 'OWE',
+	'none': 'No encryption',
+};
+
+const ENCRYPTION_MODES_USING_KEYS = new Set([
+	'psk',
+	'psk2',
+	'psk+psk2',
+	'psk-mixed',
+	'sae',
+	'sae-mixed',
+]);
+
+const DEFAULT_ENCRYPTION_OPTIONS = ['psk2', 'psk', 'sae', 'wpa3', 'none'];
+const DEFAULT_HALOW_ENCRYPTION_OPTIONS = ['sae', 'owe', 'wpa3', 'none'];
+
 function isHaLow(wifiNetwork) {
 	return wifiNetwork.ubus('dev', 'iwinfo', 'hwmodes')?.includes('ah');
 }
@@ -235,7 +264,17 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork) {
 	const map = new form.Map('wireless');
 	const s = map.section(form.NamedSection, wifiNetwork.getName());
 	s.option(morseui.SSIDListScan, 'ssid', _('SSID'));
-	s.option(form.Value, 'key', _('Key/Password'));
+	let o = s.option(form.Value, 'key', _('Key/Password'));
+	o.password = true;
+
+	// Put only the most used (i.e. key based) options in encryption.
+	o = s.option(form.ListValue, 'encryption', _('Encryption'));
+	for (const k of isHaLow(wifiNetwork) ? DEFAULT_HALOW_ENCRYPTION_OPTIONS : DEFAULT_ENCRYPTION_OPTIONS) {
+		if (ENCRYPTION_MODES_USING_KEYS.has(k)) {
+			o.value(k, ENCRYPTION_OPTIONS[k]);
+		}
+	}
+
 	// We put this hidden value in so that SSIDListScan understands it's a STA.
 	s.option(form.HiddenValue, 'mode');
 
