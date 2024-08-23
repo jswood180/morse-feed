@@ -65,10 +65,6 @@ header .close:hover {
 	margin: auto;
 	margin-bottom: var(--bottom-nav-height);
 	max-width: var(--max-content-width);
-
-	morse-config-diagram {
-		margin: auto;
-	}
 }
 
 .wizard-contents h1 {

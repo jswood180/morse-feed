@@ -186,6 +186,7 @@ class MorseConfigDiagram extends HTMLElement {
 
 			this.style['max-width'] = '900px';
 			this.style['display'] = 'block';
+			this.style['margin'] = 'auto';
 		}
 	}
 
