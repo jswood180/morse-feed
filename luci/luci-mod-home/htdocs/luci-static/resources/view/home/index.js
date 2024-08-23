@@ -129,8 +129,8 @@ function getL2Devices(netIface) {
 	const device = netIface.getL2Device();
 	if (!device) {
 		return [];
-	} else if (device.isBridge() && device.getPorts()) {
-		return device.getPorts();
+	} else if (device.isBridge()) {
+		return device.getPorts() ?? [];
 	} else {
 		return [device];
 	}
@@ -485,7 +485,7 @@ function createModeCard(ethernetPorts, wifiNetworks) {
 function createNetworkInterfacesCard(networks, wifiDevices) {
 	// For now we exclude dhcpv6 to reduce noise.
 	networks = networks.filter(n =>
-		n.getL2Device()
+		getL2Devices(n).length > 0
 		&& n.getL2Device().getName() != 'lo'
 		&& ['dhcp', 'static'].includes(n.getProtocol()));
 
