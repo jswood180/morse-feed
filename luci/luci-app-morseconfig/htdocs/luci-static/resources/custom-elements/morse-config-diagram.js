@@ -311,7 +311,7 @@ class MorseConfigDiagram extends HTMLElement {
 
 		const morseDevice = config.sections('wireless', 'wifi-device').find(s => s.type === 'morse');
 		const morseInterfaces = config.sections('wireless', 'wifi-iface').filter(s => s.device && s.device === morseDevice?.['.name']);
-		if (morseInterfaces.find(s => s.mode == 'mesh')) {
+		if (morseInterfaces.find(s => s.mode == 'mesh' && s.disabled !== '1')) {
 			this.setCurrentTemplate(TEMPLATE_MESH11S);
 			[groups, slots] = this.getMesh11sData(config, ethernetPorts);
 		} else {
