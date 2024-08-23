@@ -1,18 +1,11 @@
 'use strict';
-/* globals baseclass rpc */
+/* globals baseclass network */
+'require network';
 'require baseclass';
-'require rpc';
 
 /* Helpers to interact with actual device info.
  * (cf uci.js, which is purely UCI config manipulation).
  */
-
-const MORSE_OUI = '0c:bf:74';
-
-const callGetNetworkDevices = rpc.declare({
-	object: 'luci-rpc',
-	method: 'getNetworkDevices',
-});
 
 /**
  * Find the Morse device physical interface name (not the uci name)
@@ -21,8 +14,8 @@ const callGetNetworkDevices = rpc.declare({
  * @returns {Promise<String>} interface name (e.g. wlan0)
  */
 async function getMorseDeviceInterface() {
-	const devices = Object.values(await callGetNetworkDevices());
-	const morseDevice = devices.find(d => d.devtype == 'wlan' && d.mac.toLowerCase().startsWith(MORSE_OUI));
+	const devices = await network.getDevices();
+	const morseDevice = devices.find(d => d.getWifiNetwork() && d.getWifiNetwork().ubus('dev', 'iwinfo', 'hwmodes')?.includes('ah'));
 
 	return morseDevice?.name;
 }
