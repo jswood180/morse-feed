@@ -45,9 +45,6 @@ _maybe_press_dpp_button() {
 # Check that the device is in a DPP mode (AP or STA) and tell hostap that the
 # button is pressed if so.
 maybe_press_dpp_button() {
-	if [ "$(uci -q get prplmesh.config.enable)" = '1' ]; then
-		return
-	fi
 	config_load wireless
 	config_foreach _maybe_press_dpp_button wifi-iface
 }
