@@ -348,16 +348,6 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork) {
 // TODO: I have seen wifiNetwork be in a bad state where it hasn't loaded
 // data properly, and netIface is empty. Hence the guards. Bug in network.js?
 async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods) {
-	if (hasQRCode) {
-		const dppQRCodeSlider = dom.findClassInstance(connectMethods.querySelector('.dpp-qrcode .cbi-checkbox'));
-		const dppQRCodeImage = connectMethods.querySelector('.dpp-qrcode img');
-		if (dppQRCodeSlider.getValue() === '1') {
-			dppQRCodeImage.removeAttribute('hidden');
-		} else {
-			dppQRCodeImage.setAttribute('hidden', '');
-		}
-	}
-
 	const wifiNetwork = await network.getWifiNetwork(connectMethods.dataset.wifinetworkname);
 	const netIface = wifiNetwork.getNetwork();
 	if (netIface) {
@@ -371,6 +361,16 @@ async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods) {
 		}
 
 		connectMethods.dataset.isup = netIface.isUp();
+	}
+
+	if (isHaLow(wifiNetwork) && hasQRCode) {
+		const dppQRCodeSlider = dom.findClassInstance(connectMethods.querySelector('.dpp-qrcode .cbi-checkbox'));
+		const dppQRCodeImage = connectMethods.querySelector('.dpp-qrcode img');
+		if (dppQRCodeSlider.getValue() === '1') {
+			dppQRCodeImage.removeAttribute('hidden');
+		} else {
+			dppQRCodeImage.setAttribute('hidden', '');
+		}
 	}
 }
 
