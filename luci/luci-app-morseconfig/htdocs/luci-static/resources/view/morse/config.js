@@ -284,7 +284,7 @@ return view.extend({
 			network.getWifiNetworks(),
 			callGetBuiltinEthernetPorts(),
 			configDiagram.loadTemplate(),
-			uci.load(['network', 'wireless', 'dhcp', 'system']),
+			uci.load(['network', 'wireless', 'firewall', 'dhcp', 'system']),
 		]);
 	},
 
