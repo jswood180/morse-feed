@@ -57,8 +57,67 @@ check_sgi(){
 	fi
 }
 
+get_vfem_4v3_name() {
+	local bcf="$1"
+	local vfem_4v3="$2"
+
+	bcf="${bcf/_4v3.bin/.bin}"
+
+	if [ "$vfem_4v3" = "1" ]; then
+		bcf="${bcf%.bin}_4v3.bin"
+	fi
+	echo "$bcf"
+}
+
+check_and_add_bcf() {
+	local bcf="$1"
+	if [ -n "$bcf" ] && [ -f "/lib/firmware/morse/$bcf" ]; then
+		json_add_string "bcf" "$bcf"
+	else
+		echo "Could not find appropriate BCF file $bcf" >&2
+	fi
+}
+
+is_boost_gpio_present() {
+	local gpio="MM_BOOST"
+	boost_gpio=$(gpiofind "$gpio" | head -1)
+	if [ $? -ne 0 ] || [ -z "$boost_gpio" ]; then
+		return 1
+	fi
+	return 0
+}
+
+apply_boost_bcf() {
+	json_get_var vfem_4v3 vfem_4v3
+	json_get_var bcf bcf
+
+	vfem_4v3="${vfem_4v3:-0}"
+
+	# If there is no gpio line for MM_BOOST, abort setting boost bcf
+	if ! is_boost_gpio_present; then
+		return 1
+	fi
+
+	if [ "$vfem_4v3" = "1" ]; then
+		if [ -z "$bcf" ]; then
+			# If there is no BCF configured, currently we don't support 4.3v vfem
+			echo "Currently we don't support to enable 4.3v vfem if BCF is not explicitly configured" >&2
+		else
+			bcf=$(get_vfem_4v3_name "$bcf" "$vfem_4v3")
+			check_and_add_bcf "$bcf"
+		fi
+	else
+		if [ -n "$bcf" ]; then
+			bcf=$(get_vfem_4v3_name "$bcf" "$vfem_4v3")
+			check_and_add_bcf "$bcf"
+		fi
+	fi
+}
+
 build_morse_mod_params(){
 	json_select config
+
+	apply_boost_bcf
 
 	for var in $MM_MOD_BOOL $MM_MOD_INT $MM_MOD_STRING; do
 		json_get_var mm_mod_val "$var"
@@ -107,6 +166,7 @@ drv_morse_init_device_config() {
 	config_add_array s1g_capab
 	config_add_array channels
 	config_add_boolean vendor_keep_alive_offload
+	config_add_boolean vfem_4v3
 
 	#module parameters
 	config_add_int $MM_MOD_INT
@@ -240,6 +300,22 @@ change_module_parameters() {
 	fi
 }
 
+set_boost_gpio(){
+	local vfem_4v3=$1
+	gpio="MM_BOOST"
+
+	local boost_gpio=$(gpiofind "$gpio" | head -1)
+	if [ $? -ne 0 ] || [ -z "$boost_gpio" ]; then
+		return 1
+	fi
+
+	if [ "$vfem_4v3" = "1" ]; then
+		gpioset $boost_gpio=1
+	else
+		gpioset $boost_gpio=0
+	fi
+}
+
 drv_morse_setup() {
 	morse_band_override
 	json_select config
@@ -250,6 +326,7 @@ drv_morse_setup() {
 		frag rts htmode \
 		ampdu \
 		op_class \
+		vfem_4v3 \
 		bss_color forced_listen_interval
 	json_get_values basic_rate_list basic_rate
 	json_select ..
@@ -260,6 +337,7 @@ drv_morse_setup() {
 	if [ -n "$country" ]; then
 		if change_module_parameters || ! is_module_loaded; then
 			is_module_loaded && rmmod morse
+			set_boost_gpio $vfem_4v3
 			/sbin/kmodloader /etc/modules.d/morse
 		fi
 		# don't do iw reg set as in mac80211
