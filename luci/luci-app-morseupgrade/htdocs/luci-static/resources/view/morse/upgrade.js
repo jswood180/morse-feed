@@ -501,6 +501,11 @@ return view.extend({
 
 		let body = [
 			E('h2', {}, _('Morse Upgrade')),
+			E('p', [
+				_('A manual upgrade can be performed on the '),
+				E('a', { href: L.url('admin', 'system', 'flash') }, _('Backup/Flash Firmware page')),
+				'.',
+			]),
 			this.stateElement,
 			this.messageBox,
 			this.upgradeButton,

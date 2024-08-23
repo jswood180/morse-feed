@@ -1,7 +1,7 @@
 {
-	"admin/system/upgrade": {
+	"admin/upgrade": {
 		"title": "Upgrade",
-		"order": 40,
+		"order": 4,
 		"action": {
 			"type": "view",
 			"path": "morse/upgrade"

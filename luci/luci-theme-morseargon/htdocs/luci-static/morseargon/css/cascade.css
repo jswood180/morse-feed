@@ -1169,6 +1169,10 @@ body.uimode-advanced {
       content: var(--magic);
     }
 
+    > li[data-title="Upgrade"] > a:first-child::before {
+      content: var(--upload);
+    }
+
     > li[data-title="System"] > a:first-child::before {
       content: var(--tools);
     }
