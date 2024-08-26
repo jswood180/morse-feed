@@ -128,6 +128,7 @@ a.advanced-config-mini {
 	width: 1em;
 	height: 1em;
 	margin-left: .25em;
+	margin-right: 0.75em;
 	background: var(--primary-color-high);
 	mask-image: var(--help-icon);
 	mask-size: cover;

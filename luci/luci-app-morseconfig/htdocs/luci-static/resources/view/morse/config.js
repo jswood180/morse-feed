@@ -209,6 +209,15 @@ function isNormalNetworkIface(netIface) {
 	return netIface.disabled !== '1' && netIface['.name'] !== 'loopback' && ['dhcp', 'static'].includes(netIface['proto']);
 }
 
+function getWifiIfaceModeI18n(wifiIface) {
+	let mode = wifiIface.mode;
+	if (['ap', 'sta'].includes(mode) && wifiIface.wds === '1') {
+		mode += '-wds';
+	}
+
+	return WIFI_MODE_NAMES[mode] ?? _('Unknown');
+}
+
 return view.extend({
 	// Because we rely on the diagram code reading from the uci.js cache layer, we can't handle resets
 	// in this form normally.
@@ -618,11 +627,11 @@ return view.extend({
 		option = section.option(DynamicDummyValue, '_wifi_interfaces', _('Wireless'));
 		option.rawhtml = true;
 		option.cfgvalue = (sectionId) => {
-			const wirelessDevices = [];
+			const wirelessDevices = {};
 			for (const wifiIface of uci.sections('wireless', 'wifi-iface')) {
 				if (wifiIface.disabled !== '1' && wifiIface.network === sectionId) {
 					const deviceName = this.wifiDevices[wifiIface.device]?.getI18n()?.replace(' Wireless Controller', '');
-					const mode = WIFI_MODE_NAMES[wifiIface.mode] ?? _('Unknown');
+					const mode = getWifiIfaceModeI18n(wifiIface);
 					const ifname = this.wifiNetworks[wifiIface['.name']]?.getIfname();
 					let tooltip;
 					if (ifname) {
@@ -630,13 +639,15 @@ return view.extend({
 					} else {
 						tooltip = _('%s on %s').format(mode, deviceName);
 					}
-					const displayName = wifiIface.dpp === '1' ? '(DPP)' : (wifiIface.ssid ?? `${wifiIface.device}:${wifiIface.mode}`);
-					wirelessDevices.push(E('span', { class: 'show-info', title: tooltip }, displayName));
-					wirelessDevices.push(' ');
+					const wifiId = wifiIface.mode === 'mesh' ? `${wifiIface.mesh_id} (mesh)` : wifiIface.ssid;
+					const displayName = wifiIface.dpp === '1' ? '(DPP)' : (wifiId ?? `${wifiIface.device}:${wifiIface.mode}`);
+					(wirelessDevices[displayName] ??= []).push(tooltip);
 				}
 			}
 
-			return wirelessDevices;
+			return Object.entries(wirelessDevices).map(([name, tooltips]) => {
+				return E('span', { class: 'show-info', title: tooltips.join('\n') }, name);
+			});
 		};
 
 		option = section.option(form.MultiValue, 'device', _('Ethernet'));
