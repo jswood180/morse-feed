@@ -33,8 +33,7 @@
 			},
 			"ubus": {
 				"file": [ "write", "exec" ],
-				"uci": [ "apply", "commit", "delete", "firewall", "dhcp", "network", "wireless" ],
-				"luci": [ "setPassword" ]
+				"uci": [ "apply", "commit", "delete", "firewall", "dhcp", "network", "wireless" ]
 			}
 		}
 	}

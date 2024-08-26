@@ -8,10 +8,6 @@
 # at all.
 uci -q get luci.wizard &>/dev/null && exit 0
 
-# artini devices are primarily setup by morse-modeswitch-button and have baked in passwords,
-# so don't direct to landing page.
-[ "$(board_name)" = morse,artini ] && exit 0
-
 uci set luci.main.homepage='admin/morse/landing'
 uci set luci.wizard='wizard'
 uci commit luci

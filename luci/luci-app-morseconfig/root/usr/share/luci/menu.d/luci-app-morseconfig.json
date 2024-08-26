@@ -38,53 +38,12 @@
         }
     },
   
-    "admin/morse/landing": {
-        "order": 2,
-        "action": {
-            "type": "template",
-            "path": "morse/landing"
-        }
-    },
-
     "admin/config": {
         "title": "Quick Config",
         "order": 2,
         "action": {
             "type": "view",
             "path": "morse/config"
-        }
-    },
-
-    "admin/selectwizard": {
-        "title": "Wizards",
-        "order": 3,
-        "action": {
-            "type": "template",
-            "path": "morse/selectwizard",
-        }
-    },
-
-    "admin/morse/wizard": {
-        "order": 90,
-        "action": {
-            "type": "template",
-            "path": "morse/wizard",
-        }
-    },
-
-    "admin/morse/meshwizard": {
-        "order": 91,
-        "action": {
-            "type": "template",
-            "path": "morse/meshwizard",
-        }
-    },
-
-    "admin/morse/easymeshwizard": {
-        "order": 92,
-        "action": {
-            "type": "template",
-            "path": "morse/easymeshwizard",
         }
     },
 
