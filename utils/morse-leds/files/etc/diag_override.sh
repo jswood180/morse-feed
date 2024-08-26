@@ -20,7 +20,7 @@ if [ -z "$_mm_mode" ]; then
 	board_name="$(strings /proc/device-tree/compatible | head -1)"
 	case "$board_name" in
 	morse,artini)
-		echo '/dev/mtd1 0x0 0x1000 0x1000' > /tmp/artini_preinit_fw_sys.config
+		echo '/dev/mtd1 0x0 0x8000 0x1000' > /tmp/artini_preinit_fw_sys.config
 		_mm_mode="$(fw_printenv -n -c /tmp/artini_preinit_fw_sys.config mm_mode 2> /dev/null)"
 		rm /tmp/artini_preinit_fw_sys.config
 		;;
