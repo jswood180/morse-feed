@@ -1169,6 +1169,10 @@ body.uimode-advanced {
       content: var(--magic);
     }
 
+    > li[data-title="Wizard"] > a:first-child::before {
+      content: var(--magic);
+    }
+
     > li[data-title="Upgrade"] > a:first-child::before {
       content: var(--upload);
     }
@@ -2079,7 +2083,7 @@ body:not(.Interfaces) .cbi-rowstyle-2:first-child {
     cursor: pointer;
   }
 
-  span {
+  > span {
     margin-left: 4px;
     line-height: 30px;
   }

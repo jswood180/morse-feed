@@ -16,6 +16,7 @@ default_wifi_key="$(persistent_vars_storage.sh READ default_wifi_key)"
 if [ -z "$default_wifi_key" ]; then
 	default_wifi_key=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 8)
 fi
+uci set "system.@system[0].default_wifi_key=$default_wifi_key"
 mm_region="$(persistent_vars_storage.sh READ mm_region)"
 
 _get_iface() {

@@ -1,0 +1,17 @@
+{
+	"luci-app-morseapwizard": {
+		"description": "Grant enough access for morseapwizard to rewrite config",
+		"read": {
+			"ubus": {
+				"file": [ "read" ],
+				"luci-rpc": ["getBuiltinEthernetPorts"],
+			}
+		},
+		"write": {
+			"ubus": {
+				"file": [ "write", "exec" ],
+			},
+			"uci": [ "dhcp", "firewall", "network", "wireless", "system", "prplmesh", "mesh11sd" ]
+		}
+	}
+}

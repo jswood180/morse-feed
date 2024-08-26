@@ -1,0 +1,10 @@
+{
+    "admin/morseapwizard": {
+        "title": "Wizard",
+        "order": 2,
+        "action": {
+            "type": "view",
+            "path": "morse/morseapwizard"
+        }
+    }
+}

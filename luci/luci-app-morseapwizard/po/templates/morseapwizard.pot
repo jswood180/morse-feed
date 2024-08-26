@@ -1,0 +1,57 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:269
+msgid "802.11s Mesh Gate"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:268
+msgid "Access Point"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:270
+msgid "EasyMesh Controller/Agent"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/root/usr/share/rpcd/acl.d/luci-app-morseapwizard.json:3
+msgid "Grant enough access for morseapwizard to rewrite config"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:259
+msgid "HaLow Mode"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:274
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:286
+msgid "Network Mode"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:278
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:289
+msgid "Wi-Fi devices will get an IP on this device's local network"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:279
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:290
+msgid ""
+"Wi-Fi devices will get an IP on this device's local network and you use 2.4 "
+"GHz Wi-Fi for an uplink (not an Ethernet cable)"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:277
+msgid "Wi-Fi devices will get an IP on your existing router's network"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:298
+#: luci/luci-app-morseapwizard/root/usr/share/luci/menu.d/luci-app-morseapwizard.json:3
+msgid "Wizard"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:268
+msgid "fastest mode if <4km range required"
+msgstr ""
+
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:269
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:270
+msgid "use multiple devices for even longer range"
+msgstr ""

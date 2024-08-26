@@ -1,0 +1,326 @@
+/**
+ * This page is a one page wizard/landing page targeted at Router/AP HaLow devices which are mostly setup
+ * via factory settings/uci-defaults, but the user can specify a mode:
+ *
+ * - standard - router (AP on lan, LAN->WAN forwarding)
+ *            - AP (ethernet moved to mlan, everything else on lan)
+ * - mesh11s gate - router (AP on lan, LAN->WAN forwarding)
+ *                - AP (ethernet moved to mlan, everything else on lan)
+ * - prplmesh - (all on lan => br-prpl)
+ *
+ * Unlike our normal landing page/wizards, it does _not_ take over the UI, as it's safe for the user
+ * to _not_ do anything on this page.
+ *
+ * Future work might be to integrate this into our quick config page.
+ */
+'use strict';
+/* globals configDiagram form morseuci network rpc uci view wizard */
+'require view';
+'require network';
+'require rpc';
+'require uci';
+'require form';
+'require tools.morse.uci as morseuci';
+'require tools.morse.wizard as wizard';
+'require custom-elements.morse-config-diagram as configDiagram';
+
+document.querySelector('head').appendChild(E('link', {
+	rel: 'stylesheet',
+	type: 'text/css',
+	href: L.resourceCacheBusted('view/morse/css/morseapwizard.css'),
+}));
+
+const DEFAULT_LAN_IP = '192.168.12.1';
+
+const callGetBuiltinEthernetPorts = rpc.declare({
+	object: 'luci',
+	method: 'getBuiltinEthernetPorts',
+	expect: { result: [] },
+});
+
+return view.extend({
+	// Because we rely on the diagram code reading from the uci.js cache layer, we can't handle resets
+	// well (and really, it's such a small form that this is not worth it).
+	handleReset: null,
+
+	// We override handleSave to make sure we translate our JSONMap wizard options to actual uci
+	// config.
+	async handleSave() {
+		await this.saveToUciCache();
+		// Delete disabled wifi-ifaces to avoid confusion unless they're default_radioX.
+		// Note that we should _not_ delete them in saveToUciCache, as this is called on every update;
+		// i.e. we don't want to continually junk/recreate interfaces as user clicks around
+		// different options, particularly when those interfaces may contain useful info (e.g. mesh_id/key).
+		for (const iface of uci.sections('wireless', 'wifi-iface')) {
+			if (iface['disabled'] === '1' && !iface['.name'].startsWith('default_')) {
+				uci.remove('wireless', iface['.name']);
+			}
+		}
+		await uci.save();
+	},
+
+	async saveToUciCache() {
+		// (1) Save JSON data (to this.data).
+		await this.map.save();
+
+		// (2) Take that JSON data and turn it into uci config.
+		const {
+			morseDeviceName,
+			wifiDeviceName,
+			morseInterfaceName,
+			wifiApInterfaceName,
+			wifiStaInterfaceName,
+			morseMeshInterfaceName,
+		} = wizard.readSectionInfo();
+
+		const wifiApDisabled = uci.get('wireless', wifiApInterfaceName, 'disabled');
+
+		wizard.resetUci();
+		wizard.resetUciNetworkTopology();
+
+		// Remove primary channel width override (may have been set by mesh code).
+		uci.unset('wireless', morseDeviceName, 's1g_prim_chwidth');
+
+		// Re-enable 2.4 if our reset disabled.
+		if (uci.get('wireless', wifiApInterfaceName)) {
+			uci.set('wireless', wifiApInterfaceName, 'disabled', wifiApDisabled);
+		}
+
+		// Ensure HaLow AP is enabled/created
+		// (NB network_mode will place in appropriate network below).
+		if (uci.get('wireless', morseInterfaceName)) {
+			uci.unset('wireless', morseInterfaceName, 'disabled');
+		} else {
+			uci.add('wireless', 'wifi-iface', morseInterfaceName);
+			uci.set('wireless', morseInterfaceName, 'ssid', morseuci.getDefaultSSID());
+			uci.set('wireless', morseInterfaceName, 'key', morseuci.getDefaultWifiKey());
+			uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
+		}
+		uci.set('wireless', morseInterfaceName, 'device', morseDeviceName);
+		uci.set('wireless', morseInterfaceName, 'mode', 'ap');
+		uci.set('wireless', morseInterfaceName, 'wds', '1');
+
+		morseuci.ensureNetworkExists('lan');
+		morseuci.setupNetworkWithDnsmasq('lan', uci.get('network', 'lan', 'ip') || DEFAULT_LAN_IP);
+
+		window.uci = uci;
+		switch (this.data.wizard.device_mode) {
+			case 'standard':
+				morseuci.forceBridge('lan', 'br-lan');
+				uci.set('system', 'led_halow', 'dev', 'wlan0');
+				break;
+			case 'prplmesh':
+				morseuci.forceBridge('lan', 'br-prpl', this.bridgeMAC);
+
+				uci.set('prplmesh', 'config', 'enable', '1');
+				uci.set('prplmesh', 'config', 'gateway', '1');
+				uci.set('prplmesh', 'config', 'management_mode', 'Multi-AP-Controller-and-Agent');
+				uci.set('prplmesh', 'config', 'operating_mode', 'Gateway');
+				uci.set('prplmesh', 'config', 'wired_backhaul', '1');
+
+				if (!uci.get('prplmesh', morseDeviceName)) {
+					uci.add('prplmesh', 'wifi-device', morseDeviceName);
+				}
+				uci.set('prplmesh', morseDeviceName, 'hostap_iface', 'wlan-prpl');
+
+				uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
+				uci.set('wireless', morseInterfaceName, 'bss_transition', '1');
+				uci.set('wireless', morseInterfaceName, 'multi_ap', '3');
+				uci.set('wireless', morseInterfaceName, 'ieee80211k', '1');
+				uci.set('wireless', morseInterfaceName, 'ieee80211w', '2');
+				uci.set('wireless', morseInterfaceName, 'ifname', 'wlan-prpl');
+				uci.set('system', 'led_halow', 'dev', 'wlan-prpl');
+				uci.set('wireless', morseInterfaceName, 'wps_virtual_push_button', '1');
+				uci.set('wireless', morseInterfaceName, 'wps_independent', '0');
+				uci.set('wireless', morseInterfaceName, 'auth_cache', '0');
+				break;
+			case 'mesh':
+				morseuci.forceBridge('lan', 'br-lan');
+
+				// Avoid SW-12287 (issue with associating to co-located AP)
+				uci.set('wireless', morseDeviceName, 's1g_prim_chwidth', '1');
+
+				uci.set('mesh11sd', 'mesh_params', 'mesh_gate_announcements', '1');
+
+				if (!uci.get('wireless', morseMeshInterfaceName)) {
+					uci.add('wireless', 'wifi-iface', morseMeshInterfaceName);
+				} else {
+					uci.unset('wireless', morseMeshInterfaceName, 'disabled');
+				}
+
+				uci.set('wireless', morseMeshInterfaceName, 'mode', 'mesh');
+				// mesh11sd requires a mesh* interface name.
+				uci.set('wireless', morseMeshInterfaceName, 'ifname', 'mesh0');
+				uci.set('system', 'led_halow', 'dev', 'mesh0');
+				uci.set('wireless', morseMeshInterfaceName, 'device', morseDeviceName);
+				uci.set('wireless', morseMeshInterfaceName, 'encryption', 'sae');
+				// Use credentials from AP interface as default if we don't have them.
+				if (!uci.get('wireless', morseMeshInterfaceName, 'mesh_id')) {
+					uci.set('wireless', morseMeshInterfaceName, 'mesh_id', uci.get('wireless', morseInterfaceName, 'ssid'));
+				}
+				if (!uci.get('wireless', morseMeshInterfaceName, 'key')) {
+					uci.set('wireless', morseMeshInterfaceName, 'key', uci.get('wireless', morseInterfaceName, 'key'));
+				}
+				break;
+		}
+
+		const network_mode = this.data.wizard[this.data.wizard.device_mode === 'prplmesh' ? 'network_mode_prplmesh' : 'network_mode'];
+		switch (network_mode) {
+			case 'bridged': // lan/usblan on lan, everything else on 'wlan'
+				morseuci.ensureNetworkExists('wlan');
+				uci.set('network', 'wlan', 'proto', 'dhcp');
+				morseuci.getOrCreateForwarding('lan', 'wlan');
+
+				// Set LAN devices
+				morseuci.setNetworkDevices('lan', this.ethernetPorts.filter(p => p.device !== 'wan').map(p => p.device));
+
+				// Set WLAN devices
+				morseuci.setNetworkDevices('wlan', ['wan']);
+				for (const iface of uci.sections('wireless', 'wifi-iface')) {
+					if (iface['disabled'] !== '1') {
+						uci.set('wireless', iface['.name'], 'network', 'wlan');
+					}
+				}
+				morseuci.useBridgeIfNeeded('wlan');
+				break;
+			case 'routed_wan': // everything on lan except wan port
+			default:
+				morseuci.ensureNetworkExists('wan');
+				uci.set('network', 'wan', 'proto', 'dhcp');
+				morseuci.getOrCreateForwarding('lan', 'wan');
+
+				// Set LAN devices
+				morseuci.setNetworkDevices('lan', this.ethernetPorts.filter(p => p.device !== 'wan').map(p => p.device));
+				for (const iface of uci.sections('wireless', 'wifi-iface')) {
+					if (iface['disabled'] !== '1') {
+						uci.set('wireless', iface['.name'], 'network', 'lan');
+					}
+				}
+
+				// Set WAN devices
+				morseuci.setNetworkDevices('wan', ['wan']);
+				break;
+			case 'routed_wifi24': // everything on lan except 2.4 Wi-Fi STA; 'wan' disabled.
+				morseuci.ensureNetworkExists('wan');
+				uci.set('network', 'wan', 'proto', 'dhcp');
+				morseuci.getOrCreateForwarding('lan', 'wan');
+
+				// Set LAN devices
+				morseuci.setNetworkDevices('lan', this.ethernetPorts.filter(p => p.device !== 'wan').map(p => p.device));
+				for (const iface of uci.sections('wireless', 'wifi-iface')) {
+					if (iface['disabled'] !== '1') {
+						uci.set('wireless', iface['.name'], 'network', 'lan');
+					}
+				}
+
+				// Set WAN devices
+				if (uci.get('wireless', wifiStaInterfaceName)) {
+					uci.unset('wireless', wifiStaInterfaceName, 'disabled');
+				} else {
+					uci.add('wireless', 'wifi-iface', wifiStaInterfaceName);
+				}
+				uci.set('wireless', wifiStaInterfaceName, 'device', wifiDeviceName);
+				uci.set('wireless', wifiStaInterfaceName, 'mode', 'sta');
+				uci.set('wireless', wifiStaInterfaceName, 'network', 'wan');
+				if (!uci.get('wireless', wifiStaInterfaceName, 'ssid')) {
+					// Without setting something here, if no SSID is specified
+					// wpa_supplicant likes to connect to any open network.
+					uci.set('wireless', wifiStaInterfaceName, 'encryption', 'psk2');
+				}
+				break;
+		}
+
+		// (3) Update diagram now we've flushed our config.
+		this.diagram.updateFrom(uci, this.ethernetPorts);
+	},
+
+	load() {
+		return Promise.all([
+			network.getDevices(),
+			callGetBuiltinEthernetPorts(),
+			configDiagram.loadTemplate(),
+			uci.load(['network', 'wireless', 'dhcp', 'system', 'firewall', 'prplmesh', 'mesh11sd']),
+		]);
+	},
+
+	async render([networkDevices, ethernetPorts]) {
+		this.bridgeMAC = morseuci.getFakeMorseMAC(networkDevices) ?? morseuci.getRandomMAC();
+		this.ethernetPorts = ethernetPorts;
+		this.diagram = E('morse-config-diagram');
+		this.data = {
+			wizard: {
+				device_mode: this.getDeviceMode(),
+				network_mode: this.getNetworkMode(),
+				network_mode_prplmesh: this.getNetworkMode(),
+			},
+		};
+		this.map = new form.JSONMap(this.data);
+		const s = this.map.section(form.NamedSection, 'wizard');
+		let o = s.option(form.ListValue, 'device_mode', _('HaLow Mode'));
+		o.widget = 'radio';
+		o.orientation = 'vertical';
+		const makeOptionWithInfo = (key, val, info) => {
+			o.value(key, E('span', {}, [
+				E('span', { style: 'width: 12rem; display: inline-block;' }, val),
+				E('em', { style: 'margin-left: 1rem; width: 20rem; white-space: nowrap;' }, '← ' + info),
+			]));
+		};
+		makeOptionWithInfo('standard', _('Access Point'), _('fastest mode if <4km range required'));
+		makeOptionWithInfo('mesh', _('802.11s Mesh Gate'), _('use multiple devices for even longer range'));
+		makeOptionWithInfo('prplmesh', _('EasyMesh Controller/Agent'), _('use multiple devices for even longer range'));
+		o.onchange = () => this.saveToUciCache();
+		o.default = 'standard';
+
+		o = s.option(form.ListValue, 'network_mode', _('Network Mode'));
+		o.widget = 'radio';
+		o.orientation = 'vertical';
+		o.value('bridged', _('Wi-Fi devices will get an IP on your existing router\'s network'));
+		o.value('routed_wan', _('Wi-Fi devices will get an IP on this device\'s local network'));
+		o.value('routed_wifi24', _('Wi-Fi devices will get an IP on this device\'s local network and you use 2.4 GHz Wi-Fi for an uplink (not an Ethernet cable)'));
+		o.depends({ '!reverse': true, 'device_mode': 'prplmesh' });
+		o.onchange = () => this.saveToUciCache();
+		o.default = 'bridged';
+
+		// Prplmesh doesn't currently support bridged mode, as the Morse implementation requires the
+		// DHCP server to be on the prplmesh controller node.
+		o = s.option(form.ListValue, 'network_mode_prplmesh', _('Network Mode'));
+		o.widget = 'radio';
+		o.orientation = 'vertical';
+		o.value('routed_wan', _('Wi-Fi devices will get an IP on this device\'s local network'));
+		o.value('routed_wifi24', _('Wi-Fi devices will get an IP on this device\'s local network and you use 2.4 GHz Wi-Fi for an uplink (not an Ethernet cable)'));
+		o.depends('device_mode', 'prplmesh');
+		o.onchange = () => this.saveToUciCache();
+		o.default = 'routed_wan';
+
+		this.diagram.updateFrom(uci, this.ethernetPorts);
+
+		return await Promise.all([
+			E('h2', _('Wizard')),
+			E('div', { class: 'cbi-section' }, this.diagram),
+			this.map.render(),
+		]);
+	},
+
+	getDeviceMode() {
+		if (uci.get('prplmesh', 'config', 'enable') === '1') {
+			return 'prplmesh';
+		} else {
+			const morseDevice = uci.sections('wireless', 'wifi-device').find(ns => ns.type === 'morse');
+			if (morseDevice && uci.sections('wireless', 'wifi-iface').find(ns => ns['device'] === morseDevice['.name'] && ns['disabled'] !== '1' && ns['mode'] === 'mesh')) {
+				return 'mesh';
+			} else {
+				return 'standard';
+			}
+		}
+	},
+
+	getNetworkMode() {
+		if (morseuci.getNetworkWifiIfaces('wan').some(iface => iface['mode'] === 'sta')) {
+			return 'routed_wifi24';
+		} else if (morseuci.getNetworkDevices('wan').includes('wan')) {
+			return 'routed_wan';
+		} else {
+			return 'bridged';
+		}
+	},
+});

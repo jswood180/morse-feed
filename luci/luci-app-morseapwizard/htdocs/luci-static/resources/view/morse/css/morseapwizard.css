@@ -1,0 +1,27 @@
+.cbi-section {
+    .cbi-value-title {
+        font-weight: bold;
+    }
+}
+
+morse-config-diagram {
+    padding-bottom: 1rem;
+}
+
+@media (width < 1200px) {
+    morse-config-diagram {
+        width: 100%;
+    }
+}
+
+/* Unfortunately, the raw diagrams are slightly different heights.
+ * To avoid annoying jumping, this is a quick hack for larger
+ * (i.e. most desktop) screens to fix the height to the mesh diagram
+ * height. Unclear how to wrangle CSS the way I want; should probably
+ * make sure the original one was correct.
+ */
+@media (width >= 1200px) {
+    morse-config-diagram {
+        height: 460px;
+    }
+}
