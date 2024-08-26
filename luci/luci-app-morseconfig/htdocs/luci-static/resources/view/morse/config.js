@@ -347,14 +347,7 @@ return view.extend({
 		return Promise.all([
 			E('div', { class: 'cbi-section' }, [
 				E('h1', 'Quick Configuration'),
-				E('p', _('Change individual settings below, or use a wizard to quickly change the mode of your device.')),
-				E('p', [
-					E('a', { href: L.url('admin', 'morse', 'wizard') }, 'Access Point/Client'),
-					' | ',
-					E('a', { href: L.url('admin', 'morse', 'meshwizard') }, '802.11s Mesh'),
-					' | ',
-					E('a', { href: L.url('admin', 'morse', 'easymeshwizard') }, 'EasyMesh'),
-				]),
+				E('p', _('Use this page to quickly change individual settings. For major changes, we recommend using a Wizard (see menu).')),
 			]),
 			E('div', { class: 'cbi-section' }, diagram),
 			networkMap.render(),
