@@ -73,6 +73,11 @@ led_blink_veryfast() {
 }
 
 set_leds_normal() {
+	# There's a bug in the pwm-multicolor stuff which means colour
+	# change malfunctions if the LED is off due to a timer trigger.
+	# APP-3323
+	led_on "$status"
+
 	# This sets the color of all leds and the blink pattern on status only.
 	# The blink pattern of the other leds is controlled by /etc/init.d/led
 	led_set_color "$halow" "$light_purple"
@@ -81,7 +86,6 @@ set_leds_normal() {
 	if [ "$_mm_mode" = sta ]; then
 		led_set_color "$status" "$cyan"
 	fi
-	led_on "$status"
 }
 
 # The transitions are:
