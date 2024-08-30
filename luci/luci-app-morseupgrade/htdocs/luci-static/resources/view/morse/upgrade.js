@@ -362,7 +362,9 @@ return view.extend({
 
 		this.stateElement.classList.remove(...Object.values(states));
 		this.stateElement.classList.add(state);
+		this.stateElement.classList.remove('hidden');
 		this.messageBox.innerHTML = message;
+		this.messageBox.classList.remove('hidden');
 
 		switch (state) {
 			case states.UPGRADEREADY:
@@ -449,6 +451,12 @@ return view.extend({
 		return;
 	},
 
+	start: async function () {
+		this.stateTimeout = window.setTimeout(L.bind(this.pollState, this), 2000);
+		this.startButton.classList.add('hidden');
+		this.setState(states.LOADING, _('Checking for upgrades'));
+	},
+
 	startDownloadAndUpgrade: async function () {
 		if (!this.foundUpgrade) {
 			this.setState(states.LOADING);
@@ -481,6 +489,12 @@ return view.extend({
 		    has_rootfs_data = (procmtd.match(/"rootfs_data"/) != null) || (procmounts.match('overlayfs:/overlay / ') != null),
 		    storage_size = findStorageSize(procmtd, procpart);
 
+		this.startButton = E('button', {
+			class: 'cbi-button cbi-button-action',
+			style: 'margin: auto; margin-left: 50%; transform: translateX(-50%);',
+			click: ui.createHandlerFn(this, () => this.start()),
+		}, [_('Check for automatic upgrade')]);
+
 		this.upgradeButton = E('button', {
 			class: 'cbi-button cbi-button-action hidden',
 			style: 'margin: auto; margin-top: 40px; margin-left: 50%; transform: translateX(-50%);',
@@ -493,13 +507,13 @@ return view.extend({
 			click: ui.createHandlerFn(this, () => this.handleSysupgrade(storage_size, has_rootfs_data)),
 		}, [_('Upgrade')]);
 
-		this.stateElement = E('div', { class: 'upgrade-state loading' });
+		this.stateElement = E('div', { class: 'upgrade-state hidden' });
 
-		this.messageBox = E('div', { id: 'message', style: 'margin-top: 40px; text-align: center; display: block;' }, _('Checking for updates'));
+		this.messageBox = E('div', { id: 'message', class: 'hidden', style: 'margin-top: 40px; text-align: center; display: block;' });
 
 		this.foundUpgrade = false;
 
-		let body = [
+		return [
 			E('h2', {}, _('Morse Upgrade')),
 			E('p', [
 				_('A manual upgrade can be performed on the '),
@@ -508,12 +522,9 @@ return view.extend({
 			]),
 			this.stateElement,
 			this.messageBox,
+			this.startButton,
 			this.upgradeButton,
 			this.sysupgradeButton,
 		];
-
-		this.stateTimeout = window.setTimeout(L.bind(this.pollState, this), 2000);
-
-		return body;
 	},
 });

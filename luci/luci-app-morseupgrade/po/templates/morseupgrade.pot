@@ -1,12 +1,12 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:409
-#: htdocs/luci-static/resources/view/morse/upgrade.js:440
+#: htdocs/luci-static/resources/view/morse/upgrade.js:411
+#: htdocs/luci-static/resources/view/morse/upgrade.js:442
 msgid "<br> New image is of format:"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:505
+#: htdocs/luci-static/resources/view/morse/upgrade.js:519
 msgid "A manual upgrade can be performed on the"
 msgstr ""
 
@@ -14,7 +14,7 @@ msgstr ""
 msgid "Already up to date"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:506
+#: htdocs/luci-static/resources/view/morse/upgrade.js:520
 msgid "Backup/Flash Firmware page"
 msgstr ""
 
@@ -22,15 +22,19 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:498
-msgid "Checking for updates"
+#: htdocs/luci-static/resources/view/morse/upgrade.js:496
+msgid "Check for automatic upgrade"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/morse/upgrade.js:457
+msgid "Checking for upgrades"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/morse/upgrade.js:165
 msgid "Checking image…"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:392
+#: htdocs/luci-static/resources/view/morse/upgrade.js:394
 msgid "Configuration error occurred. Can not use upgrade service"
 msgstr ""
 
@@ -42,11 +46,11 @@ msgstr ""
 msgid "Couldn't access the MorseMicro image server"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:400
+#: htdocs/luci-static/resources/view/morse/upgrade.js:402
 msgid "Data received:"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:488
+#: htdocs/luci-static/resources/view/morse/upgrade.js:502
 msgid "Download and Upgrade"
 msgstr ""
 
@@ -58,7 +62,7 @@ msgstr ""
 msgid "Download failed"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:413
+#: htdocs/luci-static/resources/view/morse/upgrade.js:415
 msgid "Download failed with code %s."
 msgstr ""
 
@@ -122,12 +126,12 @@ msgstr ""
 msgid "MD5"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:503
+#: htdocs/luci-static/resources/view/morse/upgrade.js:517
 msgid "Morse Upgrade"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:410
-#: htdocs/luci-static/resources/view/morse/upgrade.js:441
+#: htdocs/luci-static/resources/view/morse/upgrade.js:412
+#: htdocs/luci-static/resources/view/morse/upgrade.js:443
 msgid "New firmware version available: %s"
 msgstr ""
 
@@ -143,7 +147,7 @@ msgstr ""
 msgid "Previous download in progress"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:447
+#: htdocs/luci-static/resources/view/morse/upgrade.js:449
 msgid "Ready to upgrade!"
 msgstr ""
 
@@ -196,7 +200,7 @@ msgid ""
 "uploading."
 msgstr ""
 
-#: htdocs/luci-static/resources/view/morse/upgrade.js:494
+#: htdocs/luci-static/resources/view/morse/upgrade.js:508
 #: root/usr/share/luci/menu.d/luci-app-morseupgrade.json:3
 msgid "Upgrade"
 msgstr ""
