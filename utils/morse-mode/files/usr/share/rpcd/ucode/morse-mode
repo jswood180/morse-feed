@@ -1,0 +1,169 @@
+/* Attempt to provide a simple mode representing what kind of device
+ * we are, focusing on the role of the HaLow wifi-device.
+ *
+ * This is used in the boot-prints and in LuCI.
+ */
+'use strict';
+
+import { cursor } from 'uci';
+
+
+let uci;
+
+
+/* Small publicly visible mode names.
+ * Used for top bar indicator and banner.
+ */
+const SHORT_MODE_NAMES = {
+	// EasyMesh wizard modes
+	'ap-easymesh': 'Mesh Controller',
+	'sta-easymesh': 'Mesh Agent',
+
+	// 11s Mesh wizard modes
+	'mesh-router': '11s Mesh',
+	'mesh-extender': '11s Mesh',
+
+	// Standard wizard modes
+	'ap-router': 'Access Point',
+	'sta-extender': 'Extender',
+
+	// Just report the interface.
+	// This echoes what's in resources/network.js
+	'sta': 'Client',
+	'ap': 'Access Point', // instead of Master (confusing, AP well known)
+	'mesh': '11s Mesh', // instead of Mesh Point, to distinguish from EasyMesh
+	'adhoc': 'Ad-Hoc',
+	'monitor': 'Monitor',
+	'none': 'None',
+};
+
+
+// Report if there's forwarding to or from this network interface.
+function get_forwarding(network_iface) {
+	if (!uci.load('firewall')) {
+		return {sources: [], dests: []};
+	}
+
+	const zone = filter(values(uci.get_all('firewall')),
+		z => z['.type'] === 'zone' && network_iface in z.network)[0];
+	if (!zone) {
+		return {sources: [], dests: []};
+	}
+
+	const sources = filter(values(uci.get_all('firewall')),
+		f => f['.type'] === 'forwarding' && f.enabled !== '0' && f.src === zone.name);
+	const dests = filter(values(uci.get_all('firewall')),
+		f => f['.type'] === 'forwarding' && f.enabled !== '0' && f.dest === zone.name);
+
+	return {sources, dests};
+}
+
+
+function get_ports(network_iface) {
+	const device_name = uci.get('network', network_iface, 'device');
+	const device = filter(values(uci.get_all('network')),
+		d => d['.type'] === 'device' && d.name === device_name && d.type === 'bridge')[0];
+
+	return device?.ports ?? [];
+}
+
+
+// Discover if it looks like one of our standard easymesh/router/extender configs.
+function get_wizard_mode(halow_iface) {
+	if (uci.get('prplmesh', 'config', 'enable') === '1') {
+		return 'easymesh';
+	}
+
+	if (!uci.load('network')) {
+		return null;
+	}
+
+	const proto = uci.get('network', halow_iface.network, 'proto');
+	const forwarding = get_forwarding(halow_iface.network);
+	const ports = get_ports(halow_iface.network);
+
+	switch (proto) {
+	case 'dhcp':
+		if ((length(forwarding.dests) > 0 || length(ports) > 0) && halow_iface.mode in ['mesh', 'sta']) {
+			return 'extender';
+		}
+		break;
+	case 'static':
+		if (length(forwarding.sources) && halow_iface.mode in ['mesh', 'ap']) {
+			return 'router';
+		}
+		break;
+	}
+
+	return null;
+}
+
+
+function get_morse_device() {
+	return filter(values(uci.get_all('wireless')),
+		s => s['.type'] === 'wifi-device' && s.type === 'morse' && s.disabled !== '1')[0];
+}
+     
+
+function get_ifaces(device_name) {
+	return filter(values(uci.get_all('wireless')),
+		s => s['.type'] === 'wifi-iface' && s.device === device_name && s.disabled !== '1' && s.mode !== 'none');
+}
+
+
+function get_best_halow_iface(device) {
+	const ifaces = get_ifaces(device['.name']);
+	if (length(ifaces) === 0) {
+		return null;
+	}
+
+	const IFACE_ORDER = ['sta', 'mesh', 'adhoc', 'ap', 'monitor'];
+	sort(ifaces, (a, b) => IFACE_ORDER.index(a) - IFACE_ORDER.index(b));
+
+	return ifaces[0];
+}
+
+
+function get_morse_mode(halow_iface) {
+	if (!halow_iface) {
+		return 'none';
+	}
+
+	const wizard_mode = get_wizard_mode(halow_iface);
+	if (!wizard_mode) {
+		return halow_iface.mode;
+	}
+
+	return `${halow_iface.mode}-${wizard_mode}`;
+}
+
+
+function query() {
+	uci = cursor();
+
+	if (!uci.load('wireless')) {
+		return null;
+	}
+	uci.load('prpmesh');
+
+	const device = get_morse_device();
+	const iface = device && get_best_halow_iface(device);
+	const morse_mode = get_morse_mode(iface);
+
+	return {
+		morse_mode,
+		morse_mode_short_display: SHORT_MODE_NAMES[morse_mode] ?? morse_mode,
+		device,
+		iface,
+		prplmesh_config: uci.get_all('prplmesh', 'config'),
+	};
+}
+
+
+return {
+	'morse-mode': {
+		query: {
+			call: query,
+		}
+	}
+};

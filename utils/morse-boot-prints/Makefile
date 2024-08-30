@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=morse-boot-prints
-PKG_RELEASE=1
+PKG_RELEASE=2
 
 PKG_LICENSE:=
 PKG_LICENSE_FILES:=
@@ -21,6 +21,7 @@ define Package/morse-boot-prints
   SECTION:=Utilities
   CATEGORY:=Utilities
   TITLE:=Morse Boot Info Prints
+  DEPENDS:=+morse-mode
 endef
 
 define Build/Compile
@@ -33,7 +34,7 @@ define Package/morse-boot-prints/install
 
 	# init script
 	$(INSTALL_DIR) $(1)/etc/init.d/
-	$(INSTALL_BIN) ./files/etc/init.d/boot_prints $(1)/etc/init.d/
+	$(INSTALL_BIN) ./files/etc/init.d/morse-boot-prints $(1)/etc/init.d/
 
 	# banners
 	$(INSTALL_DIR) $(1)/morse/banners/
