@@ -159,24 +159,28 @@ return view.extend({
 	handleSave: null,
 	handleReset: null,
 
-	// this, and handleSysupgradeConfirm are practically a direct copy paste from the flash.js.
-	//  some massaging was required to replace the ui.uploadFile which started this function.
-	handleSysupgrade: function (storage_size, has_rootfs_data) {
-		ui.showModal(_('Checking image…'), [
-			E('span', { class: 'spinning' }, _('Verifying the uploaded image file.')),
-		]);
+	handleManualUpload: function (storage_size, has_rootfs_data, ev) {
+		return ui.uploadFile('/tmp/sysupgrade.bin', ev.target.firstChild)
+			.then(L.bind(this.handleSysupgrade, this, storage_size, has_rootfs_data));
+	},
+
+	handleSysupgradeAuto: function (storage_size, has_rootfs_data) {
 		return callFileStat('/tmp/sysupgrade.bin')
 			.then((res) => {
 				res['sha256sum'] = this.search.sum;
-				return [res];
-			})
-			.then((reply) => {
-				return callSystemValidateFirmwareImage('/tmp/sysupgrade.bin')
-					.then(function (res) {
-						reply.push(res);
-						return reply;
-					});
-			})
+				return res;
+			}).then(L.bind(this.handleSysupgrade, this, storage_size, has_rootfs_data));
+	},
+
+	// this, and handleSysupgradeConfirm are practically a direct copy paste from the flash.js.
+	//  some massaging was required to replace the ui.uploadFile which started this function.
+	handleSysupgrade: function (storage_size, has_rootfs_data, file_stat) {
+		ui.showModal(_('Checking image…'), [
+			E('span', { class: 'spinning' }, _('Verifying the uploaded image file.')),
+		]);
+
+		return callSystemValidateFirmwareImage('/tmp/sysupgrade.bin')
+			.then(function (res) { return [file_stat, res]; })
 			.then((reply) => {
 				return fs.exec('/sbin/sysupgrade', ['--test', '/tmp/sysupgrade.bin'])
 					.then(function (res) {
@@ -201,7 +205,6 @@ return view.extend({
 				body.push(E('p', _('The flash image was uploaded. Below is the checksum and file size listed, compare them with the original file to ensure data integrity. <br /> Click \'Continue\' below to start the flash procedure.')));
 				body.push(E('ul', {}, [
 					res[0].size ? E('li', {}, '%s: %1024.2mB'.format(_('Size'), res[0].size)) : '',
-					res[0].checksum ? E('li', {}, '%s: %s'.format(_('MD5'), res[0].checksum)) : '',
 					res[0].sha256sum ? E('li', {}, '%s: %s'.format(_('SHA256'), res[0].sha256sum)) : '',
 				]));
 
@@ -454,6 +457,10 @@ return view.extend({
 	start: async function () {
 		this.stateTimeout = window.setTimeout(L.bind(this.pollState, this), 2000);
 		this.startButton.classList.add('hidden');
+		// Hide the manual button to prevent user confusion and avoid the
+		// possibility of that process writing to the same file as the automatic
+		// process.
+		this.manualUploadButton.classList.add('hidden');
 		this.setState(states.LOADING, _('Checking for upgrades'));
 	},
 
@@ -504,8 +511,14 @@ return view.extend({
 		this.sysupgradeButton = E('button', {
 			class: 'cbi-button cbi-button-action hidden',
 			style: 'margin: auto; margin-top: 40px; margin-left: 50%; transform: translateX(-50%);',
-			click: ui.createHandlerFn(this, () => this.handleSysupgrade(storage_size, has_rootfs_data)),
+			click: ui.createHandlerFn(this, () => this.handleSysupgradeAuto(storage_size, has_rootfs_data)),
 		}, [_('Upgrade')]);
+
+		this.manualUploadButton = E('button', {
+			class: 'cbi-button cbi-button-action',
+			style: 'margin: auto; margin-top: 40px; margin-left: 50%; transform: translateX(-50%);',
+			click: L.bind(this.handleManualUpload, this, storage_size, has_rootfs_data),
+		}, [_('Manually upload firmware file')]);
 
 		this.stateElement = E('div', { class: 'upgrade-state hidden' });
 
@@ -516,7 +529,7 @@ return view.extend({
 		return [
 			E('h2', {}, _('Morse Upgrade')),
 			E('p', [
-				_('A manual upgrade can be performed on the '),
+				_('Additional firmware controls can be found on the '),
 				E('a', { href: L.url('admin', 'system', 'flash') }, _('Backup/Flash Firmware page')),
 				'.',
 			]),
@@ -525,6 +538,7 @@ return view.extend({
 			this.startButton,
 			this.upgradeButton,
 			this.sysupgradeButton,
+			this.manualUploadButton,
 		];
 	},
 });
