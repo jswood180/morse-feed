@@ -6,6 +6,16 @@
 	local posix = require "nixio.fs"
 
 	local boardinfo = util.ubus("system", "board")
+	local modeinfo = util.ubus("morse-mode", "query")
+
+	local mode_link = ""
+	local mode_links = {"/cgi-bin/luci/admin/morseapwizard", "/cgi-bin/luci/admin/selectwizard"}
+	for _, link in ipairs(mode_links) do
+		if posix.stat(link, "type") ~= "file" then
+			mode_link = link
+			break
+		end
+	end
 
 	local node = disp.context.dispatched
 
@@ -162,6 +172,13 @@
 								<a class="brand" href="#"></a>
 							</div>
 							<div class="status" id="indicators"></div>
+							<div class="mode-status">
+								<span data-style="active">
+									<a href="<%= mode_link%>">
+										<%=modeinfo.morse_mode_short_display%>
+									</a>
+								</span>
+							</div>
 							<% if found_other_language then %>
 							<div class="languages">
 								<% local first = true %>

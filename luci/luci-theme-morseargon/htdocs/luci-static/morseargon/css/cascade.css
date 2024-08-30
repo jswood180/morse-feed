@@ -787,6 +787,7 @@ header {
 
       .flex1 {
         flex: 1;
+        white-space: nowrap;
 
         .showSide {
           display: none;
@@ -825,8 +826,18 @@ header {
       }
     }
 
+    /* If we don't do this, too many status elements cause bad wrapping
+     * in mobile view. Hidden is not ideal either, of course.
+     */
     .status {
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .status,
+    .mode-status {
       span {
+        color: #fff !important;
         display: inline-block;
         font-size: 0.875rem;
         font-weight: bold;
@@ -841,8 +852,8 @@ header {
         box-shadow: 0 2px 2px 0 rgb(0 0 0 / 16%), 0 0 2px 0 rgb(0 0 0 / 12%);
         margin: 0 0.25rem;
 
-        &:last-child {
-          margin-right: 0;
+        a {
+          color: #fff;
         }
       }
 
@@ -855,7 +866,6 @@ header {
       }
 
       span[data-style="inactive"] {
-        color: #fff !important;
         background-color: #32325d;
       }
     }
@@ -974,7 +984,7 @@ body.uimode-advanced {
   }
 
   header .status span[data-indicator="poll-status"] {
-    display: initial;
+    display: inline-block;
   }
 }
 

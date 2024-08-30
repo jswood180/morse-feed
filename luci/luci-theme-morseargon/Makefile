@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI Morse Micro Argon Theme
-LUCI_DEPENDS:=
+LUCI_DEPENDS:=+morse-mode
 
 PKG_LICENSE:=Apache-2.0
 
