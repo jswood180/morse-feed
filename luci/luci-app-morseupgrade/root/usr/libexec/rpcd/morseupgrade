@@ -227,7 +227,7 @@ verify () {
 		return
 	fi
 
-	if ! echo "$1  /tmp/sysupgrade.bin" | sha256sum -c &/dev/null; then
+	if ! echo "$1  /tmp/sysupgrade.bin" | sha256sum -csw; then
 		cat <<-JSON_EOF
 		{
 		    "status": "SHAMismatchError",
