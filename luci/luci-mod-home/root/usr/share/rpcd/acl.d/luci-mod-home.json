@@ -14,6 +14,15 @@
 		}
 	},
 
+	"luci-mod-home-index-mode": {
+		"description": "Grant access to mode info",
+		"read": {
+			"ubus": {
+				"morse-mode": [ "query" ]
+			}
+		}
+	},
+
 	"luci-mod-home-index-dhcp": {
 		"description": "Grant access to DHCP status display",
 		"read": {

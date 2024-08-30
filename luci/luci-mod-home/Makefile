@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI Home
-LUCI_DEPENDS:=+luci-base +libiwinfo +luci-app-morseconfig +luci-lib-vivagraphjs
+LUCI_DEPENDS:=+luci-base +libiwinfo +luci-app-morseconfig +luci-lib-vivagraphjs +morse-mode
 
 # Because we're using newer CSS, csstidy makes a mess.
 CONFIG_LUCI_CSSTIDY:=

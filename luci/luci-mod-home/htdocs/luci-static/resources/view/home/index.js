@@ -61,6 +61,11 @@ const callSystemBoard = rpc.declare({
 	method: 'board',
 });
 
+const callMorseModeQuery = rpc.declare({
+	object: 'morse-mode',
+	method: 'query',
+});
+
 const callSessionAccess = rpc.declare({
 	object: 'session',
 	method: 'access',
@@ -98,6 +103,23 @@ function tr(tag, items) {
 function makeClass(n) {
 	return n.getName().replace(/[^\w-]/g, '-');
 }
+
+const MORSE_MODES = {
+	'ap-router': _('Router with HaLow Access Point'),
+	'sta-extender': _('HaLow Extender'),
+	'mesh-router': _('HaLow 11s Mesh Router'),
+	'mesh-extender': _('HaLow 11s Mesh Extender'),
+	'ap-easymesh': _('HaLow EasyMesh Controller'),
+	'sta-easymesh': _('HaLow EasyMesh Agent'),
+
+	// Remaining items align
+	'ap': _('HaLow Access Point'),
+	'sta': _('HaLow Client'),
+	'adhoc': _('HaLow Ad-Hoc'),
+	'mesh': _('HaLow 11s Mesh'),
+	'monitor': _('HaLow Monitor'),
+	'none': _('No HaLow enabled'),
+};
 
 // These are extracted from LuCI's view/network/wireless.js.
 const ENCRYPTION_OPTIONS = {
@@ -192,39 +214,6 @@ function getBestDevice(netIface) {
 
 	return devices.reduce((best, current) =>
 		scoreDevice(current.getWifiNetwork()) > scoreDevice(best.getWifiNetwork()) ? current : best);
-}
-
-function getHaLowMode(wifiNetworks) {
-	// Confusingly, if 'mode' is unset getMode() reports it's an AP
-	// (normal default?) but a HaLow iface without a mode doesn't come
-	// up properly at all.
-	const haLowWifiNetworks = wifiNetworks.filter(n => !n.isDisabled() && isHaLow(n) && n.get('mode'));
-	if (haLowWifiNetworks.length === 0) {
-		return _('No HaLow enabled');
-	}
-
-	// Choose the first one that we can find.
-	let haLowWifiNetwork = haLowWifiNetworks[0];
-	// Prefer mesh, then ap, over other modes.
-	for (const mode of ['mesh', 'ap']) {
-		const betterWifiNetwork = haLowWifiNetworks.find(n => n.get('mode') === mode);
-		if (betterWifiNetwork) {
-			haLowWifiNetwork = betterWifiNetwork;
-			break;
-		}
-	}
-
-	if (haLowWifiNetwork.getMode() === 'mesh') {
-		return uci.get('mesh11sd', 'mesh_params', 'mesh_gate_announcements') === '1'
-			? _('802.11s Mesh Gate')
-			: _('802.11s Mesh Point');
-	} else if (uci.get('prplmesh', 'config', 'enable') === '1') {
-		return uci.get('prplmesh', 'config', 'management_mode') === 'Multi-AP-Agent'
-			? _('EasyMesh Agent')
-			: _('EasyMesh Controller/Agent');
-	} else {
-		return _('HaLow') + ` ${haLowWifiNetwork.getActiveModeI18n()}`;
-	}
 }
 
 function createSystemCard(boardinfo) {
@@ -497,8 +486,8 @@ async function createUplinkCard(netIface, hasQRCode) {
 	});
 }
 
-function createModeCard(ethernetPorts, wifiNetworks) {
-	const mode = getHaLowMode(wifiNetworks);
+function createModeCard(morseModeQuery, ethernetPorts) {
+	const morseMode = MORSE_MODES[morseModeQuery['morse_mode']] || _('Unknown');
 	const diagramMini = E('morse-config-diagram');
 	diagramMini.updateFrom(uci, ethernetPorts);
 	const diagramMax = E('morse-config-diagram');
@@ -511,11 +500,11 @@ function createModeCard(ethernetPorts, wifiNetworks) {
 		heading: _('Mode'),
 		link: { href: L.url('admin', 'selectwizard'), title: _('Change mode via wizard') },
 		contents: [
-			E('h4', mode),
+			E('h4', morseMode),
 			E('div', { class: 'click-to-expand' }, diagramMini),
 		],
 		maxContents: [
-			E('h4', mode),
+			E('h4', morseMode),
 			E('div', {}, diagramMax),
 		],
 	});
@@ -1009,9 +998,10 @@ return view.extend({
 	},
 
 	async repeatLoad() {
-		const [boardinfo, ethernetPorts, dhcpLeases] = await Promise.all([
+		const [boardinfo, ethernetPorts, morseMode, dhcpLeases] = await Promise.all([
 			callSystemBoard(),
 			callGetBuiltinEthernetPorts(),
+			callMorseModeQuery(),
 			callLuciDHCPLeases().then((result) => {
 				// Compress IPv6 and IPv4 so we can try to show in one table.
 				// Possibly ill-advised; some info loss.
@@ -1049,7 +1039,7 @@ return view.extend({
 			network.flushCache(true),
 		]);
 
-		return { boardinfo, ethernetPorts, dhcpLeases };
+		return { boardinfo, ethernetPorts, morseMode, dhcpLeases };
 	},
 
 	async render([onceLoadData, repeatLoadData]) {
@@ -1115,7 +1105,7 @@ return view.extend({
 		return E('div');
 	},
 
-	async createCards({ hasQRCode, boardinfo, ethernetPorts, dhcpLeases }) {
+	async createCards({ hasQRCode, boardinfo, ethernetPorts, morseMode, dhcpLeases }) {
 		// Turn list into obj with getName() as keys.
 		function makeObj(l) {
 			return l.reduce((o, d) => (o[d.getName()] = d, o), {});
@@ -1140,7 +1130,7 @@ return view.extend({
 
 		const cards = [
 			createSystemCard(boardinfo),
-			createModeCard(ethernetPorts, Object.values(wifiNetworks)),
+			createModeCard(morseMode, ethernetPorts),
 		];
 
 		if (uci.get('prplmesh', 'config', 'enable') === '1') {
