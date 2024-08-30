@@ -3459,7 +3459,8 @@ div[style*="display:grid;grid-template-columns:repeat"] {
 
 /* admin-system-flash */
 
-[data-page="admin-system-flash"] {
+[data-page="admin-system-flash"],
+[data-page="admin-upgrade"] {
   .cbi-value {
     padding: 0 1rem;
   }
@@ -3508,6 +3509,16 @@ div[style*="display:grid;grid-template-columns:repeat"] {
 
     .btn {
       white-space: normal !important;
+      text-align: initial;
+    }
+
+    li {
+      word-break: break-all;
+    }
+
+    *,
+    ul {
+      margin-top: 0;
     }
 
     vertical-align: text-top;
