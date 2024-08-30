@@ -4,9 +4,9 @@
 
 USERNAME=$(uci -q get upgrade.@upgrade[0].user)
 PASSWORD=$(uci -q get upgrade.@upgrade[0].password)
+REPO=$(uci -q get upgrade.@upgrade[0].repo)
 LOGGER="morseupgrade"
 UCLIENT_PARAMS="--user=$USERNAME --password=$PASSWORD"
-MORSE_SWAPPS_REPO="https://repo.apps.morsemicro.com/openwrt/releases/latest/targets"
 OUTPUTBIN="/tmp/sysupgrade.bin"
 
 if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
@@ -43,14 +43,14 @@ search () {
 	target=
 	rootfs_type=
 	query &> /dev/null
-	targets=$(uclient-fetch $UCLIENT_PARAMS -O - "$MORSE_SWAPPS_REPO"/"$target"/profiles.json 2>/dev/null)
+	targets=$(uclient-fetch $UCLIENT_PARAMS -O - "$REPO"/"$target"/profiles.json 2>/dev/null)
 	target_status=$?
 	if [ "$target_status" -ne "0" ]; then
 		# Note, the error string and message strings (for oks) are mainly for ubus, and probably shouldn't be parsed by a UI.
 		cat <<-JSON_EOF
 		{
 		    "status": "HTTPError",
-		    "error": "Couldn't access $MORSE_SWAPPS_REPO/$target/profiles.json",
+		    "error": "Couldn't access $REPO/$target/profiles.json",
 		    "code": "$target_status"
 		}
 		JSON_EOF
@@ -153,7 +153,7 @@ download () {
 	rm /tmp/sysupgrade.* &> /dev/null
 
 	echo 0 > /tmp/sysupgrade.status
-	{(uclient-fetch $UCLIENT_PARAMS -O "$OUTPUTBIN" "$MORSE_SWAPPS_REPO"/"$target"/"$1" &> /dev/null; echo $? > /tmp/sysupgrade.status) &}
+	{(uclient-fetch $UCLIENT_PARAMS -O "$OUTPUTBIN" "$REPO"/"$target"/"$1" &> /dev/null; echo $? > /tmp/sysupgrade.status) &}
 	echo $! > /tmp/sysupgrade.pid
 	cat <<-JSON_EOF
 	{
