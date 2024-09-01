@@ -101,6 +101,12 @@ ${_('When configured as a DHCP Server, the address is sent to DHCP clients.')}<b
 ${_('If this interface is not the connection to external subnets, you don\'t need to set a gateway. Leave it blank.')}<br>
 `;
 
+const BRIDGED_WIFI_ERROR = _(`
+Network "%s" has a Wi-Fi client without WDS bridged with other devices. Either remove the other devices, enable WDS, or remove it from the network.
+
+WARNING: Unless you have an OpenWrt-based Access Point with WDS enabled, enabling WDS on the client will not work.
+`).trim();
+
 // This is based on widgets.NetworkSelect, but uses the zone style colouring
 // rather than the attached devices icons.
 const SimpleNetworkSelect = form.ListValue.extend({
@@ -278,8 +284,7 @@ return view.extend({
 			if (bridge) {
 				for (const wifiIface of morseuci.getNetworkWifiIfaces(network['.name'])) {
 					if (wifiIface.mode === 'sta' && wifiIface.wds !== '1') {
-						throw new TypeError(
-							_('Network "%s" has a Wi-Fi client without WDS bridged with other devices. Either remove the other devices, enable WDS, or remove it from the network.').format(network['.name']));
+						throw new TypeError(BRIDGED_WIFI_ERROR.format(network['.name']));
 					}
 				}
 			}
@@ -415,9 +420,9 @@ return view.extend({
 		}
 
 		const MODE_TOOLTIP = _(`
-			Change the mode of your Wi-Fi interface. To enable Wi-Fi extenders, you should select WDS (Wireless Distribution System)
-			modes for Access Points and Clients (Stations). Note that non-WDS Clients can connect to WDS Access Points, but
-			WDS Clients cannot connect to non-WDS Access Points, so we recommend always using WDS for Access Points.
+			Change the mode of your Wi-Fi interface. To enable HaLow Wi-Fi extenders, you should select WDS (Wireless Distribution System)
+			modes for Access Points and Clients (Stations). For 2.4 Wi-Fi, we recommend leaving this disabled unless you
+			are certain you have devices compatible with OpenWrt's WDS.
 		`).replace(/[\t\n ]+/g, ' ');
 		option = section.option(form.ListValue, 'mode', E('span', { class: 'show-info', title: MODE_TOOLTIP }, _('Mode')));
 		for (const [k, v] of Object.entries(WIFI_MODE_NAMES)) {
