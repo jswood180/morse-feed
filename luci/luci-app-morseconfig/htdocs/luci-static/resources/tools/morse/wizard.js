@@ -569,7 +569,7 @@ const AbstractWizardView = view.extend({
 		if (this.currentPageIndex !== 0) {
 			ui.showModal(_('Abort HaLow Configuration Wizard'), [
 				E('p', _(`Leaving the wizard will discard any selections you've made.
-					  You can return to the wizard by going to the 'Morse' menu.`)),
+					  You can return to the wizard by going to the 'Wizards' menu item.`)),
 				E('div', { class: 'right' }, [
 					E('button', {
 						class: 'btn',

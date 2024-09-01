@@ -7,8 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI Camera Viewer
-# Only depends on luci-app-morseconfig because it places itself in the Morse menu.
-LUCI_DEPENDS:=+rpcd-mod-onvif +luci-lib-httpclient +mediamtx +luci-app-morseconfig
+LUCI_DEPENDS:=+rpcd-mod-onvif +luci-lib-httpclient +mediamtx
 
 PKG_LICENSE:=Apache-2.0
 
