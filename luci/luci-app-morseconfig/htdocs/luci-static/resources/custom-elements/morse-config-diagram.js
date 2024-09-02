@@ -11,7 +11,8 @@ const DEVICE = {
 
 const TEMPLATE_STANDARD = 'morse-config-diagram';
 const TEMPLATE_MESH11S = 'morse-config-diagram-mesh11s';
-const TEMPLATES = [TEMPLATE_STANDARD, TEMPLATE_MESH11S];
+const TEMPLATE_MATTER = 'morse-config-diagram-matter';
+const TEMPLATES = [TEMPLATE_STANDARD, TEMPLATE_MESH11S, TEMPLATE_MATTER];
 
 function defaultObject() {
 	return new Proxy(Object.create(null), {
@@ -311,9 +312,19 @@ class MorseConfigDiagram extends HTMLElement {
 
 		const morseDevice = config.sections('wireless', 'wifi-device').find(s => s.type === 'morse');
 		const morseInterfaces = config.sections('wireless', 'wifi-iface').filter(s => s.device && s.device === morseDevice?.['.name']);
+		const isMatterDevice = config.sections('matter').find(s => s.enable === '1');
+
 		if (morseInterfaces.find(s => s.mode == 'mesh' && s.disabled !== '1')) {
 			this.setCurrentTemplate(TEMPLATE_MESH11S);
 			[groups, slots] = this.getMesh11sData(config, ethernetPorts);
+		} else if (isMatterDevice) {
+			this.setCurrentTemplate(TEMPLATE_MATTER);
+			this.style['text-align'] = 'center';
+			// For now Matter SVG does not have any group or slots as it just displays the matter logo if the device is configured
+			// as a Matter device. Later when we certify Matter for OpenWRT we can add a slot to toggle message showing if the device
+			// has been certified or not.
+			groups = new Set();
+			slots = defaultObject();
 		} else {
 			this.setCurrentTemplate(TEMPLATE_STANDARD);
 			[groups, slots] = this.getStandardData(config, ethernetPorts);

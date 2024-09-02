@@ -27,6 +27,9 @@ const SHORT_MODE_NAMES = {
 	'ap-router': 'Access Point',
 	'sta-extender': 'Extender',
 
+	// Matter wizard mode
+	'sta-matter': 'Matter',
+
 	// Just report the interface.
 	// This echoes what's in resources/network.js
 	'sta': 'Client',
@@ -72,6 +75,10 @@ function get_ports(network_iface) {
 function get_wizard_mode(halow_iface) {
 	if (uci.get('prplmesh', 'config', 'enable') === '1') {
 		return 'easymesh';
+	}
+
+	if (uci.get('matter', 'config', 'enable') === '1') {
+		return 'matter';
 	}
 
 	if (!uci.load('network')) {

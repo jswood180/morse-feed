@@ -13,6 +13,7 @@ return view.extend({
 		return await Promise.all([
 			uci.load('prplmesh').then(() => true).catch(() => false),
 			uci.load('mesh11sd').then(() => true).catch(() => false),
+			uci.load('matter').then(() => true).catch(() => false),
 			uci.load('luci'),
 		]);
 	},
@@ -33,7 +34,7 @@ return view.extend({
 		]);
 	},
 
-	render([hasPrplmesh, hasMesh11sd]) {
+	render([hasPrplmesh, hasMesh11sd, hasMatter]) {
 		const cards = [
 			this.card(
 				L.url('admin', 'morse', 'wizard'),
@@ -57,6 +58,15 @@ return view.extend({
 					_('EasyMesh'),
 					_('Setup your device as part of EasyMesh (either as a Mesh Controller or a Mesh Agent).'),
 					L.resourceCacheBusted('view/morse/images/easymeshwizard.svg'),
+				));
+		}
+		if (hasMatter) {
+			cards.push(
+				this.card(
+					L.url('admin', 'morse', 'matterwizard'),
+					_('Matter'),
+					_('Setup your device as part of Matter. (Matter not certified for this product)'),
+					L.resourceCacheBusted('view/morse/images/matterwizard.svg'),
 				));
 		}
 		return E('div', { class: 'wizard-contents' }, [

@@ -294,6 +294,7 @@ return view.extend({
 	load() {
 		return Promise.all([
 			fetch(DPP_QRCODE_PATH, { method: 'HEAD' }).then(r => r.ok),
+			uci.load('matter').then(() => true).catch(() => false),
 			network.getWifiDevices(),
 			network.getWifiNetworks(),
 			callGetBuiltinEthernetPorts(),
@@ -304,11 +305,12 @@ return view.extend({
 		]);
 	},
 
-	async render([hasQRCode, wifiDevices, wifiNetworks, ethernetPorts]) {
+	async render([hasQRCode, hasMatter, wifiDevices, wifiNetworks, ethernetPorts]) {
 		this.hasQRCode = hasQRCode;
 		this.ethernetPorts = ethernetPorts;
 		this.wifiDevices = wifiDevices.reduce((o, d) => (o[d.getName()] = d, o), {});
 		this.wifiNetworks = wifiNetworks.reduce((o, n) => (o[n.getName()] = n, o), {});
+		this.hasMatter = hasMatter;
 
 		const networkMap = new form.Map('network', [
 			_('Network Interfaces'),

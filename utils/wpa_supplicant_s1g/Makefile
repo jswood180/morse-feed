@@ -63,13 +63,14 @@ MMWPA_SUPPLICANT_CONFIG_ENABLE = \
 	CONFIG_SAE \
 	CONFIG_TESTING_OPTIONS \
 	CONFIG_PMKSA_CACHE_EXTERNAL \
-	CONFIG_WNM
+	CONFIG_WNM \
+	CONFIG_CTRL_IFACE_DBUS_NEW \
+	CONFIG_CTRL_IFACE_DBUS_INTRO \
+	CONFIG_IPV6
 
 MMWPA_SUPPLICANT_CONFIG_DISABLE = \
 	CONFIG_BGSCAN_SIMPLE \
 	CONFIG_SMARTCARD \
-	CONFIG_CTRL_IFACE_DBUS_NEW \
-	CONFIG_CTRL_IFACE_DBUS_INTRO \
 	CONFIG_READLINE
 
 MMWPA_SUPPLICANT_CONFIG_EDITS += 's/\#\(CONFIG_TLS=openssl\)/\1/'
@@ -94,7 +95,7 @@ define Package/wpa_supplicant_s1g
   CATEGORY:=Network
   SUBMENU:=WirelessAPD
   TITLE:=Morse Micro HaLow wpa_supplicant
-  DEPENDS:= +kmod-morse +libnl +libopenssl +libubus
+  DEPENDS:= +kmod-morse +libnl +libopenssl +libubus +dbus +libdbus
   USERID:=network=101:network=101
   PROVIDES:=wpa_supplicant_s1g
 endef
@@ -108,7 +109,7 @@ define Package/libwpa_client
 endef
 
 define Package/libwpa_client/description
-  wpa_supplicant_s1g client liberary
+  wpa_supplicant_s1g client library
 endef
 
 define Package/wpa_supplicant_s1g/config
@@ -135,7 +136,7 @@ TARGET_CPPFLAGS := \
 	-D_GNU_SOURCE
 
 TARGET_LDFLAGS += -lnl-3 -lnl-genl-3 -lnl-route-3
-TARGET_LDFLAGS += -lm -lpthread -lcrypto -lssl
+TARGET_LDFLAGS += -lm -lpthread -lcrypto -lssl -ldbus-1
 
 define Build/RunMake
 	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" \
@@ -158,8 +159,10 @@ endef
 
 define Package/wpa_supplicant_s1g/install
 	$(INSTALL_DIR) $(1)/sbin
+	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/wpa_supplicant_s1g $(1)/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/wpa_cli_s1g $(1)/sbin/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wpa_supplicant/dbus/dbus-wpa_supplicant_s1g.conf $(1)/etc/dbus-1/system.d/wpa_supplicant_s1g.conf
 endef
 
 define Package/libwpa_client/install

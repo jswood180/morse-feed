@@ -283,7 +283,7 @@ function resetUci() {
 	}
 
 	uci.set('prplmesh', 'config', 'enable', '0');
-
+	uci.set('matter', 'config', 'enable', '0');
 	resetUciNetworkTopology();
 }
 

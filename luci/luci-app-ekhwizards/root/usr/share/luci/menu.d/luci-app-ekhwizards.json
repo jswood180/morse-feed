@@ -38,5 +38,13 @@
             "type": "template",
             "path": "morse/easymeshwizard",
         }
+    },
+
+    "admin/morse/matterwizard": {
+        "order": 92,
+        "action": {
+            "type": "template",
+            "path": "morse/matterwizard",
+        }
     }
 }

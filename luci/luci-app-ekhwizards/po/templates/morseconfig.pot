@@ -7,7 +7,15 @@ msgstr "Content-Type: text/plain; charset=UTF-8"
 msgid "2.4 GHz Wi-Fi Access Point"
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:48
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:250
+msgid "3 wire"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:249
+msgid "4 wire"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:49
 msgid "802.11s Mesh"
 msgstr ""
 
@@ -38,6 +46,13 @@ msgid ""
 "<p>This wizard will guide you in setting up this device as part of EasyMesh. "
 "<p>You can exit now if you prefer to complete your configuration manually.</"
 "p>"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:29
+msgid ""
+"<p>This wizard will guide you in setting up this device as part of a Matter "
+"application. <p>You can exit now if you prefer to complete your "
+"configuration manually.</p>"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:15
@@ -130,7 +145,24 @@ msgid ""
 "interference."
 msgstr ""
 
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:245
+msgid "BLE Protocol"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:257
+msgid "BLE UART Port"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:221
+msgid "BLE UART port to use"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:220
+msgid "BLE protocol to use"
+msgstr ""
+
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:409
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:291
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:408
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:540
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:476
@@ -150,6 +182,7 @@ msgid "Click <b>Apply</b> to persist your configuration."
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:641
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:314
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:698
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:745
 msgid "Click below to exit the wizard"
@@ -226,11 +259,15 @@ msgstr ""
 msgid "DPP (Device Provisioning Protocol) QR Code"
 msgstr ""
 
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:224
+msgid "Discriminator"
+msgstr ""
+
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/landing.js:138
 msgid "Dismiss"
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:57
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:58
 msgid "EasyMesh"
 msgstr ""
 
@@ -282,6 +319,7 @@ msgid "Ethernet (Router)"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:410
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:292
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:409
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:477
 msgid "Extender"
@@ -350,6 +388,7 @@ msgid ""
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:389
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:280
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:386
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:456
 msgid ""
@@ -364,6 +403,7 @@ msgid ""
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:390
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:281
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:387
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:457
 msgid ""
@@ -381,6 +421,7 @@ msgid ""
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:387
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:278
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:384
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:454
 msgid ""
@@ -397,12 +438,37 @@ msgid ""
 "traffic."
 msgstr ""
 
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:214
+msgid ""
+"Lighting application discriminator value. This is an interger value unique "
+"to this device. The value is used to the identify the device that need to be "
+"commissioned by the controller"
+msgstr ""
+
 #: luci/luci-app-ekhwizards/ucode/template/wizard_view.ut:8
 msgid "Loading view..."
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:370
 msgid "Manual credentials"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:67
+msgid "Matter"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:190
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:193
+msgid "Matter Application"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:212
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:226
+msgid "Matter Configurations"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:28
+msgid "Matter Wizard"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:319
@@ -436,6 +502,7 @@ msgstr ""
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:408
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:457
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:514
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:290
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:407
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:459
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:516
@@ -445,10 +512,41 @@ msgstr ""
 msgid "None"
 msgstr ""
 
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:217
+msgid ""
+"OTA Application discriminator value. This is an interger value unique to "
+"this device. The value is used to the identify the device that need to be "
+"commissioned by the controller"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:235
+msgid "OTA Discriminator"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:13
+msgid ""
+"On/Off Lighing Application. This is a Matter controlled light. The "
+"controller will be able to contol the light after provissioning"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:21
+msgid "On/Off Lighting Application"
+msgstr ""
+
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:370
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:363
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:342
 msgid "Operating Frequency"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:22
+msgid "Over-The-Air Matter Software Update Provider"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:15
+msgid ""
+"Over-The-Air Matter Software Update Provider Application. This is used to "
+"update the Matter application image"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:363
@@ -500,17 +598,22 @@ msgstr ""
 msgid "Setup Mesh Network"
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:41
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:42
 msgid "Setup your device as a normal Access Point (AP) or Client (Station)."
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:58
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:59
 msgid ""
 "Setup your device as part of EasyMesh (either as a Mesh Controller or a Mesh "
 "Agent)."
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:49
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:68
+msgid ""
+"Setup your device as part of Matter. (Matter not certified for this product)"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:50
 msgid ""
 "Setup your device as part of an 802.11s Mesh (either as a Mesh Point or a "
 "Mesh Gate)."
@@ -520,7 +623,7 @@ msgstr ""
 msgid "Some perms the wizards require mostly copied from luci-app-morseconfig"
 msgstr ""
 
-#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:40
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/selectwizard.js:41
 msgid "Standard WiFi HaLow"
 msgstr ""
 
@@ -560,6 +663,7 @@ msgid ""
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:379
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:269
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:374
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:530
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:441
@@ -568,6 +672,7 @@ msgid "Traffic Mode"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:402
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:285
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:401
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:469
 msgid "Traffic mode"
@@ -638,6 +743,7 @@ msgid ""
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:380
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:270
 msgid ""
 "We recommend configuring this device as an <b>Extender</b> to create a "
 "separate network for the non-HaLow devices. This device will run a DHCP "
@@ -668,6 +774,7 @@ msgid "WiFi HaLow Wizard"
 msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:640
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:313
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/meshwizard.js:697
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/wizard.js:744
 msgid "Wizard Complete"
@@ -714,6 +821,11 @@ msgid ""
 "upstream Ethernet connection, etc.)."
 msgstr ""
 
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:190
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:212
+msgid "You can configure your device as a Matter application"
+msgstr ""
+
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:314
 msgid ""
 "You can configure your device as an <b>EasyMesh Controller</b> or as an "
@@ -732,4 +844,8 @@ msgstr ""
 
 #: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/easymeshwizard.js:609
 msgid "You can view the EasyMesh topology from the Status page"
+msgstr ""
+
+#: luci/luci-app-ekhwizards/htdocs/luci-static/resources/view/morse/matterwizard.js:248
+msgid "bcm"
 msgstr ""

@@ -271,6 +271,24 @@ get_mesh11sd_config() {
 	json_select ..
 }
 
+get_matter_config() { 
+	config_load matter
+	var=
+	
+	json_select config
+
+	config_get var config enable
+	json_add_int matter_enable $var
+
+	config_get var config ble_proto
+	json_add_string ble_proto "$var"
+
+	config_get vat config ble_uart_port
+	json_add_string ble_uart_port "$var"
+
+	json_select ..
+}
+
 is_module_loaded() {
 	lsmod | grep -q '^morse '
 }
@@ -412,8 +430,9 @@ drv_morse_setup() {
 	for_each_interface "ap" morse_setup_ap
 
 	[ -n "$has_sta" ] && {
+		get_matter_config
 		json_select config
-		json_get_vars vendor_keep_alive_offload
+		json_get_vars vendor_keep_alive_offload matter_enable
 		json_select ..
 	}
 	for_each_interface "sta" morse_setup_sta
@@ -548,7 +567,6 @@ morse_iface_bringup() {
 
 	json_add_string macaddr "$macaddr"
 	json_select ..
-
 	case "$mode" in
 		ap)
 			has_ap=1
@@ -693,7 +711,7 @@ morse_setup_sta() {
 	json_select config
 	json_get_vars ifname
 
-	morse_wpa_supplicant_add $ifname 1 || failed=1
+	morse_wpa_supplicant_add $ifname 1 $matter_enable|| failed=1
 	#mark that we have already started the wpa_supp_s1g
 	already_have_wpa_supplicant_running=1
 	json_select ..
@@ -715,7 +733,7 @@ morse_setup_mesh() {
 	json_select config
 	json_get_vars ifname
 
-	morse_wpa_supplicant_add $ifname 1 || failed=1
+	morse_wpa_supplicant_add $ifname 1 0 || failed=1
 	#mark that we have already started the wpa_supp_s1g
 	already_have_wpa_supplicant_running=1
 	json_select ..
@@ -743,7 +761,7 @@ morse_setup_adhoc() {
 	json_select config
 	json_get_vars ifname
 
-	morse_wpa_supplicant_add $ifname 1 || failed=1
+	morse_wpa_supplicant_add $ifname 1 0 || failed=1
 	#mark that we have already started the wpa_supp_s1g
 	already_have_wpa_supplicant_running=1
 	json_select ..
@@ -973,6 +991,9 @@ morse_hostapd_add_raw(){
 morse_wpa_supplicant_add() {
 	local _ifname=$1
 	local _enable=$2
+	local matter=$3
+	local _save_dir="/etc/morse"
+	local _save_file="${_save_dir}/wpa_supplicant-wlan-saved-over-boot.conf"
 
 	if [ "$_enable" = 0 ]; then
 		echo "interface is disabled"
@@ -995,14 +1016,25 @@ morse_wpa_supplicant_add() {
 	fi
 
 	_wpa_supplicant_common $_ifname
-	#need to handle bridge mode??
-	/sbin/wpa_supplicant_s1g -t -D nl80211 -s -i $_ifname -c $_config -B
+
+	# As $_config ends up /var which is symlink to /tmp
+	# the HaLow credentials are lost across reboot
+	# So save them outside /var
+	if [ "$matter" = 1 ]; then
+		if ! [ -f "$_save_file" ]; then
+			mkdir -p $_save_dir
+			cp $_config $_save_file
+		fi
+		/sbin/wpa_supplicant_s1g -t -u -D nl80211 -s -i $_ifname -c $_save_file -B
+	else
+		#need to handle bridge mode??
+		/sbin/wpa_supplicant_s1g -t -D nl80211 -s -i $_ifname -c $_config -B
+	fi
 
 	#React to DPP events (wpa_s1g_dpp_action will persist creds and restart network)
 	[ "$dpp" = 1 ] && /usr/sbin/wpa_event_listener -a "/lib/netifd/morse/wpa_s1g_dpp_action.sh" -B
 	return 0
 }
-
 
 #################################################
 #

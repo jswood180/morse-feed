@@ -111,6 +111,7 @@ const MORSE_MODES = {
 	'mesh-extender': _('HaLow 11s Mesh Extender'),
 	'ap-easymesh': _('HaLow EasyMesh Controller'),
 	'sta-easymesh': _('HaLow EasyMesh Agent'),
+	'sta-matter': _('Matter'),
 
 	// Remaining items align
 	'ap': _('HaLow Access Point'),
@@ -1036,6 +1037,7 @@ return view.extend({
 			uci.load('prplmesh').catch(() => null),
 			uci.load(['wireless', 'network', 'firewall', 'dhcp', 'luci', 'system']),
 			uci.load('mesh11sd').catch(() => null),
+			uci.load('matter').catch(() => null),
 			network.flushCache(true),
 		]);
 
