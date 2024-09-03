@@ -101,7 +101,16 @@ function tr(tag, items) {
 }
 
 function makeClass(n) {
-	return n.getName().replace(/[^\w-]/g, '-');
+	const sanitised = n.getName().replace(/[^\w-]/g, '-');
+	if (n.getProtocol) {
+		// For simplicity, we allow passing both uci networks and devices
+		// into highlights, but there's no clean way to determine the network
+		// since we don't have easy access to the underlying class (Protocol). The presence
+		// of getProtocol though tells us it's not a device but a network iface.
+		return `iface--${sanitised}`;
+	} else {
+		return sanitised;
+	}
 }
 
 const MORSE_MODES = {
