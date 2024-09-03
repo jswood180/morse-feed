@@ -52,6 +52,19 @@ resetting the device to Access Point mode (shown by a solid green Status LED):
 </ul>
 `).trim();
 
+const INVALID_CONFIG_MESSAGE = _(`
+<p>This device is in a state where this wizard cannot work (%s).
+
+To configure via this page, you should factory reset:
+
+<ul>
+	<li>hold the mode button until the Status LED starts <strong>slowly flashing green</strong>,
+		then release the button
+	<li>wait until the LED is <strong>solid green</strong>
+	<li>find this device at 192.168.12.1
+</ul>
+`).trim();
+
 const DEFAULT_LAN_IP = '192.168.12.1';
 
 const callGetBuiltinEthernetPorts = rpc.declare({
@@ -108,6 +121,9 @@ return view.extend({
 		// Remove primary channel width override (may have been set by mesh code).
 		uci.unset('wireless', morseDeviceName, 's1g_prim_chwidth');
 
+		// Make sure Morse device is enabled.
+		uci.unset('wireless', morseDeviceName, 'disabled');
+
 		// Re-enable 2.4 if our reset disabled.
 		if (uci.get('wireless', wifiApInterfaceName)) {
 			uci.set('wireless', wifiApInterfaceName, 'disabled', wifiApDisabled);
@@ -117,20 +133,13 @@ return view.extend({
 		// (NB network_mode will place in appropriate network below).
 		if (uci.get('wireless', morseInterfaceName)) {
 			uci.unset('wireless', morseInterfaceName, 'disabled');
-		} else {
-			uci.add('wireless', 'wifi-iface', morseInterfaceName);
-			uci.set('wireless', morseInterfaceName, 'ssid', morseuci.getDefaultSSID());
-			uci.set('wireless', morseInterfaceName, 'key', morseuci.getDefaultWifiKey());
-			uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
 		}
-		uci.set('wireless', morseInterfaceName, 'device', morseDeviceName);
 		uci.set('wireless', morseInterfaceName, 'mode', 'ap');
 		uci.set('wireless', morseInterfaceName, 'wds', '1');
 
 		morseuci.ensureNetworkExists('lan');
 		morseuci.setupNetworkWithDnsmasq('lan', uci.get('network', 'lan', 'ip') || DEFAULT_LAN_IP);
 
-		window.uci = uci;
 		switch (this.data.wizard.device_mode) {
 			case 'standard':
 				morseuci.forceBridge('lan', 'br-lan');
@@ -262,26 +271,42 @@ return view.extend({
 	},
 
 	async load() {
-		const morseModeInfo = await callMorseModeQuery();
+		const [networkDevices, ethernetPorts, morseModeInfo] = await Promise.all([
+			network.getDevices(),
+			callGetBuiltinEthernetPorts(),
+			callMorseModeQuery(),
+			configDiagram.loadTemplate(),
+			uci.load(['network', 'wireless', 'dhcp', 'system', 'firewall', 'prplmesh', 'mesh11sd']),
+		]);
+
 		if (morseModeInfo.persistent_morse_mode === 'sta') {
+			this.errorMessage = EXTENDER_MODE_MESSAGE;
+		} else {
+			try {
+				const { wifiDevice } = wizard.readSectionInfo();
+
+				if (!wifiDevice) {
+					this.errorMessage = INVALID_CONFIG_MESSAGE.format('No 2.4 Wi-Fi radio found');
+				}
+			} catch (e) {
+				this.errorMessage = INVALID_CONFIG_MESSAGE.format(e.message);
+			}
+		}
+
+		// Hide buttons if we want an error message.
+		if (this.errorMessage) {
 			this.handleSave = null;
 			this.handleSaveApply = null;
 		}
 
-		return await Promise.all([
-			morseModeInfo,
-			network.getDevices(),
-			callGetBuiltinEthernetPorts(),
-			configDiagram.loadTemplate(),
-			uci.load(['network', 'wireless', 'dhcp', 'system', 'firewall', 'prplmesh', 'mesh11sd']),
-		]);
+		return [networkDevices, ethernetPorts];
 	},
 
-	async render([morseModeInfo, networkDevices, ethernetPorts]) {
-		if (morseModeInfo.persistent_morse_mode === 'sta') {
+	async render([networkDevices, ethernetPorts]) {
+		if (this.errorMessage) {
 			return [
 				E('h2', _('Wizard')),
-				E('section', { class: 'message' }, EXTENDER_MODE_MESSAGE),
+				E('section', { class: 'message' }, this.errorMessage),
 			];
 		}
 

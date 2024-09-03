@@ -149,7 +149,7 @@ class WizardConfigError extends Error { }
  *
  * This is somewhat similar to missingSections in morseconf.js, except that
  * it both validates the existence of and extracts the relevant sections.
- * It exists becausethe wizard was originally written independently,
+ * It exists because the wizard was originally written independently,
  * and has significant overlap with the logic in missing sections
  * (and things like mmGetMorseDevice). We should refactor it as part of APP-2033.
  */
@@ -182,12 +182,28 @@ function readSectionInfo() {
 	}
 
 	if (morseDevice && !uci.get('wireless', morseInterfaceName)) {
-		throw new WizardConfigError('No default wifi-interface for HaLow radio');
+		uci.add('wireless', 'wifi-iface', morseInterfaceName);
+		uci.set('wireless', morseInterfaceName, 'mode', 'ap');
+		uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
+		uci.set('wireless', morseInterfaceName, 'ssid', morseuci.getDefaultSSID());
+		uci.set('wireless', morseInterfaceName, 'mesh_id', morseuci.getDefaultSSID());
+		uci.set('wireless', morseInterfaceName, 'key', morseuci.getDefaultWifiKey());
+		uci.set('wireless', morseInterfaceName, 'disabled', '1');
 	}
+	// Force sane device.
+	uci.set('wireless', morseInterfaceName, 'device', morseDeviceName);
 
 	if (wifiDevice && !uci.get('wireless', wifiApInterfaceName)) {
-		throw new WizardConfigError('No default wifi-interface for 2.4 GHz radio');
+		uci.add('wireless', 'wifi-iface', wifiApInterfaceName);
+		uci.set('wireless', wifiApInterfaceName, 'mode', 'ap');
+		uci.set('wireless', wifiApInterfaceName, 'encryption', 'psk2');
+		uci.set('wireless', wifiApInterfaceName, 'ssid', morseuci.getDefaultSSID());
+		uci.set('wireless', wifiApInterfaceName, 'mesh_id', morseuci.getDefaultSSID());
+		uci.set('wireless', wifiApInterfaceName, 'key', morseuci.getDefaultWifiKey());
+		uci.set('wireless', wifiApInterfaceName, 'disabled', '1');
 	}
+	// Force sane device.
+	uci.set('wireless', wifiApInterfaceName, 'device', morseDeviceName);
 
 	return {
 		ethInterfaceName,
