@@ -185,13 +185,21 @@ function getWifiName(wifiNetwork) {
 }
 
 function getL2Devices(netIface) {
-	// Like netIface.getL2Device, but converts bridge into its associated sub-devices.
+	// Like netIface.getL2Device, but converts bridge into its associated sub-devices
+	// and excludes WDS generated interfaces.
 
 	const device = netIface.getL2Device();
 	if (!device) {
 		return [];
 	} else if (device.isBridge()) {
-		return device.getPorts() ?? [];
+		// Unclear how to nicely exclude WDS generated interfaces, so we use '.'
+		// (i.e. exclude 'wlan0.sta1' etc.).
+		const ports = device.getPorts();
+		if (!ports) {
+			return [];
+		} else {
+			return ports.filter(p => !(p.getType() === 'wifi' && p.getName().includes('.')));
+		}
 	} else {
 		return [device];
 	}
