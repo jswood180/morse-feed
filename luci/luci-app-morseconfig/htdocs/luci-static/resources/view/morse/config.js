@@ -55,6 +55,15 @@ const callGetBuiltinEthernetPorts = rpc.declare({
 // These are from LuCI's resources/network.js, but unfortunately they're buried
 // in a switch statement there.
 const WIFI_MODE_NAMES = {
+	ap: _('Access Point'),
+	sta: _('Client'),
+	mesh: _('Mesh Point'),
+	adhoc: _('Ad-Hoc'),
+	monitor: _('Monitor'),
+};
+
+// For HaLow chips, we want to encourage people to set WDS.
+const HALOW_WIFI_MODE_NAMES = {
 	'ap-wds': _('Access Point (WDS)'),
 	'ap': _('Access Point (no WDS)'),
 	'sta-wds': _('Client (WDS)'),
@@ -101,11 +110,8 @@ ${_('When configured as a DHCP Server, the address is sent to DHCP clients.')}<b
 ${_('If this interface is not the connection to external subnets, you don\'t need to set a gateway. Leave it blank.')}<br>
 `;
 
-const BRIDGED_WIFI_ERROR = _(`
-Network "%s" has a Wi-Fi client without WDS bridged with other devices. Either remove the other devices, enable WDS, or remove it from the network.
-
-WARNING: Unless you have an OpenWrt-based Access Point with WDS enabled, enabling WDS on the client will not work.
-`).trim();
+const BRIDGED_HALOW_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client without WDS bridged with other devices. Either remove the other devices, enable WDS, or remove it from the network.');
+const BRIDGED_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client on the same network as other devices. Either remove the other devices or remove it from the network.');
 
 // This is based on widgets.NetworkSelect, but uses the zone style colouring
 // rather than the attached devices icons.
@@ -284,7 +290,11 @@ return view.extend({
 			if (bridge) {
 				for (const wifiIface of morseuci.getNetworkWifiIfaces(network['.name'])) {
 					if (wifiIface.mode === 'sta' && wifiIface.wds !== '1') {
-						throw new TypeError(BRIDGED_WIFI_ERROR.format(network['.name']));
+						if (this.wifiDevices[wifiIface.device]?.get('type') === 'morse') {
+							throw new TypeError(BRIDGED_HALOW_WIFI_STA_ERROR.format(network['.name']));
+						} else {
+							throw new TypeError(BRIDGED_WIFI_STA_ERROR.format(network['.name']));
+						}
 					}
 				}
 			}
@@ -380,6 +390,7 @@ return view.extend({
 	},
 
 	renderWifiInterfaces(map, deviceName) {
+		const isMorse = uci.get('wireless', deviceName, 'type') === 'morse';
 		const section = map.section(form.TableSection, 'wifi-iface');
 		section.filter = sectionId => deviceName === uci.get('wireless', sectionId, 'device');
 		section.addremove = true;
@@ -423,11 +434,10 @@ return view.extend({
 
 		const MODE_TOOLTIP = _(`
 			Change the mode of your Wi-Fi interface. To enable HaLow Wi-Fi extenders, you should select WDS (Wireless Distribution System)
-			modes for Access Points and Clients (Stations). For 2.4 Wi-Fi, we recommend leaving this disabled unless you
-			are certain you have devices compatible with OpenWrt's WDS.
+			modes for Access Points and Clients (Stations).
 		`).replace(/[\t\n ]+/g, ' ');
 		option = section.option(form.ListValue, 'mode', E('span', { class: 'show-info', title: MODE_TOOLTIP }, _('Mode')));
-		for (const [k, v] of Object.entries(WIFI_MODE_NAMES)) {
+		for (const [k, v] of Object.entries(isMorse ? HALOW_WIFI_MODE_NAMES : WIFI_MODE_NAMES)) {
 			option.value(k, v);
 		}
 		option.onchange = function (ev, sectionId) {
@@ -435,55 +445,69 @@ return view.extend({
 			// Clear key on change.
 			this.section.getUIElement(sectionId, '_wpa_key').setValue('');
 		};
-		option.write = function (sectionId, value) {
-			if (this.cfgvalue(sectionId) === value) {
-				// Don't do anything if config remains unchanged
-				return;
-			}
-			switch (value) {
-				case 'ap-wds':
-					uci.set('wireless', sectionId, 'mode', 'ap');
-					uci.set('wireless', sectionId, 'wds', '1');
-					uci.unset('wireless', sectionId, 'ifname');
-					break;
-
-				case 'sta-wds':
-					uci.set('wireless', sectionId, 'mode', 'sta');
-					uci.set('wireless', sectionId, 'wds', '1');
-					uci.unset('wireless', sectionId, 'ifname');
-					break;
-
-				case 'mesh':
-					uci.set('wireless', sectionId, 'mode', 'mesh');
-					uci.set('wireless', sectionId, 'ifname', 'mesh0');
-					uci.unset('wireless', sectionId, 'wds');
-					break;
-
-				default:
-					uci.set('wireless', sectionId, 'mode', value);
-					uci.unset('wireless', sectionId, 'wds');
-					uci.unset('wireless', sectionId, 'ifname');
-					break;
-			}
-			// Unset the ifname which was set specifically for mesh
-			if (uci.get('wireless', sectionId, 'ifname') === 'mesh0' && value != 'mesh') {
-				uci.unset('wireless', sectionId, 'ifname');
-			}
-		};
-		option.cfgvalue = function (section_id) {
-			const mode = uci.get('wireless', section_id, 'mode');
-			if (uci.get('wireless', section_id, 'wds') === '1') {
-				if (mode === 'ap') {
-					return 'ap-wds';
-				} else if (mode === 'sta') {
-					return 'sta-wds';
+		if (!isMorse) {
+			// Since we don't support WDS here, and in advanced config changing
+			// the mode would let you select the WDS status (similar to our HaLow
+			// dropdown here), if we've changed let's remove WDS.
+			option.write = function (sectionId, value) {
+				if (this.cfgvalue(sectionId) === value) {
+					// Don't do anything if config remains unchanged.
+					return;
 				}
-			}
 
-			return mode;
-		};
+				uci.unset('wireless', sectionId, 'wds');
+				uci.set('wireless', sectionId, 'mode', value);
+			};
+		} else {
+			// For HaLow, add special handling to set WDS and mesh
+			// (i.e. setting ifname to mesh0 if it's a Mesh Point so mesh11sd
+			// picks it up).
+			option.write = function (sectionId, value) {
+				if (this.cfgvalue(sectionId) === value) {
+					// Don't do anything if config remains unchanged.
+					return;
+				}
+				switch (value) {
+					case 'ap-wds':
+						uci.set('wireless', sectionId, 'mode', 'ap');
+						uci.set('wireless', sectionId, 'wds', '1');
+						uci.unset('wireless', sectionId, 'ifname');
+						break;
 
-		if (this.hasQRCode) {
+					case 'sta-wds':
+						uci.set('wireless', sectionId, 'mode', 'sta');
+						uci.set('wireless', sectionId, 'wds', '1');
+						uci.unset('wireless', sectionId, 'ifname');
+						break;
+
+					case 'mesh':
+						uci.set('wireless', sectionId, 'mode', 'mesh');
+						uci.set('wireless', sectionId, 'ifname', 'mesh0');
+						uci.unset('wireless', sectionId, 'wds');
+						break;
+
+					default:
+						uci.set('wireless', sectionId, 'mode', value);
+						uci.unset('wireless', sectionId, 'wds');
+						uci.unset('wireless', sectionId, 'ifname');
+						break;
+				}
+			};
+			option.cfgvalue = function (section_id) {
+				const mode = uci.get('wireless', section_id, 'mode');
+				if (uci.get('wireless', section_id, 'wds') === '1') {
+					if (mode === 'ap') {
+						return 'ap-wds';
+					} else if (mode === 'sta') {
+						return 'sta-wds';
+					}
+				}
+
+				return mode;
+			};
+		}
+
+		if (this.hasQRCode && isMorse) {
 			const DPP_TOOLTIP = _('This enables DPP via QRCode for clients (access points automatically support DPP).');
 			option = section.option(form.Flag, 'dpp', E('span', { class: 'show-info', title: DPP_TOOLTIP }, _('DPP')));
 			option.depends({ '!contains': true, 'mode': 'sta' });
@@ -528,10 +552,7 @@ return view.extend({
 		option = section.option(form.ListValue, 'encryption', _('Encryption'));
 		option.depends({ dpp: '0' });
 		option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
-		const defaultEncryptionOptions = uci.get('wireless', deviceName, 'type') === 'morse'
-			? DEFAULT_HALOW_ENCRYPTION_OPTIONS
-			: DEFAULT_ENCRYPTION_OPTIONS;
-		const encryptionOptions = Array.from(defaultEncryptionOptions);
+		const encryptionOptions = Array.from(isMorse ? DEFAULT_HALOW_ENCRYPTION_OPTIONS : DEFAULT_ENCRYPTION_OPTIONS);
 		for (const wi of uci.sections('wireless', 'wifi-iface')) {
 			if (wi.device === deviceName && wi.encryption && !encryptionOptions.includes(wi.encryption)) {
 				encryptionOptions.push(wi.encryption);
