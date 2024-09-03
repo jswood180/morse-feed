@@ -48,17 +48,42 @@
 					</div>
 					<div class="input-group pass-icon">
 						<input class="cbi-input-password" id="cbi-input-password" type="password" name="luci_password" />
+						<span class="input-group passreveal-icon"></span>
 						<label class="border" for="cbi-input-password"></label>
 					</div>
-				</div>
 				<div>
 					<input type="submit" value="<%:Log in%>" class="cbi-button cbi-button-apply" />
 				</div>
 			</form>
 			<script type="text/javascript">//<![CDATA[
+				let passwordInputs = document.querySelectorAll('.cbi-input-password');
+				passwordInputs.forEach(function(input) {
+					let icon = input.nextElementSibling;
+					if (icon && icon.classList.contains('passreveal-icon')) {
+						function toggleIconVisibility() {
+							if (input.value.length > 0) {
+								icon.style.display = 'contents';
+							} else {
+								icon.style.display = 'none';
+							}
+						}
+
+						toggleIconVisibility();
+						// Listen for input events to toggle the icon display
+						input.addEventListener('input', toggleIconVisibility);
+						icon.addEventListener('click', function() {
+							if (input.type === 'password') {
+								input.type = 'text';
+							} else {
+								input.type = 'password';
+							}
+						});
+
+					}
+				});
 				var input = document.getElementsByName('luci_password')[0];
 				if (input)
 					input.focus();
-			//]]></script>
+		//]]></script>
 
 <%+footer%>

@@ -552,6 +552,23 @@ h5 {
             top: 10px;
           }
 
+          &::after {
+            font-family: var(--icon-font) !important;
+            font-style: normal;
+            font-weight: normal;
+            font-variant: normal;
+            text-transform: none;
+            line-height: 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color: var(--default);
+            font-size: 1.5rem;
+            position: absolute;
+            z-index: 100;
+            right: 10px;
+            top: 10px;
+          }
+
           .border {
             position: absolute;
             width: 100%;
@@ -597,6 +614,10 @@ h5 {
 
         .pass-icon::before {
           content: var(--lock-fill);
+        }
+
+        .passreveal-icon::after {
+          content: var(--eye);
         }
       }
 
