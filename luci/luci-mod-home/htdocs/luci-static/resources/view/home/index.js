@@ -716,23 +716,25 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 					E('dt', _('SSID')),
 					E('dd', wifiNetwork.getSSID()),
 					E('dt', _('Key/Password')),
-					E('dd', { class: 'password-field' }, [
-						E('span', {
-							style: 'display: none',
-							class: 'password-reveal',
+					E('dd', { class: 'control-group' }, [
+						E('input', {
+							type: 'password',
+							value: wifiPassword,
+							class: 'cbi-input-password',
+							readonly: true,
+						}),
+						E('button', {
+							class: 'cbi-button cbi-button-neutral',
+							tabindex: '-1"',
 							click: (e) => {
-								e.target.style.display = 'none';
-								e.target.parentElement.querySelector('.password-hide').style.display = 'initial';
+								const passwordInput = e.target.previousElementSibling;
+								if (passwordInput.type === 'password') {
+									passwordInput.type = 'text';
+								} else {
+									passwordInput.type = 'password';
+								}
 							},
-						}, wifiPassword),
-						E('span', {
-							class: 'password-hide',
-							title: _('Reveal password'),
-							click: (e) => {
-								e.target.style.display = 'none';
-								e.target.parentElement.querySelector('.password-reveal').style.display = 'initial';
-							},
-						}, '●●●●●●●●'),
+						}, '*'),
 					]),
 				].filter(e => e))),
 				// Currently, we only support DPP on HaLow.
