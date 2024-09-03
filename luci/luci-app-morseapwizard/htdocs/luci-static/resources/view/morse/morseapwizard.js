@@ -30,12 +30,39 @@ document.querySelector('head').appendChild(E('link', {
 	href: L.resourceCacheBusted('view/morse/css/morseapwizard.css'),
 }));
 
+// This wizard is only designed for Artini's AP mode. If we detect an Extender mode
+// situation, give the user some hints.
+const EXTENDER_MODE_MESSAGE = _(`
+<p>This device is currently setup as an Extender (shown by a solid aqua Status LED),
+which is not configurable in general. To be able to change these settings requires
+resetting the device to Access Point mode (shown by a solid green Status LED):
+<ul>
+	<li>hold the mode button until the Status LED starts <strong>slowly flashing green</strong>,
+		then release the button
+	<li>wait until the LED is <strong>solid green</strong>
+	<li>find this device at 192.168.12.1
+</ul>
+
+<p>To stay in Extender mode but make a new connection to an Access Point:
+<ul>
+	<li>hold the mode button and wait until the Status LED starts <strong>quickly flashing aqua</strong>,
+		then release the button
+	<li>wait until the LED is <strong>solid aqua</strong>
+	<li>a short button press first on the Access Point then on the Extender will initiate pairing; see the user guide for details
+</ul>
+`).trim();
+
 const DEFAULT_LAN_IP = '192.168.12.1';
 
 const callGetBuiltinEthernetPorts = rpc.declare({
 	object: 'luci',
 	method: 'getBuiltinEthernetPorts',
 	expect: { result: [] },
+});
+
+const callMorseModeQuery = rpc.declare({
+	object: 'morse-mode',
+	method: 'query',
 });
 
 return view.extend({
@@ -234,8 +261,15 @@ return view.extend({
 		this.diagram.updateFrom(uci, this.ethernetPorts);
 	},
 
-	load() {
-		return Promise.all([
+	async load() {
+		const morseModeInfo = await callMorseModeQuery();
+		if (morseModeInfo.persistent_morse_mode === 'sta') {
+			this.handleSave = null;
+			this.handleSaveApply = null;
+		}
+
+		return await Promise.all([
+			morseModeInfo,
 			network.getDevices(),
 			callGetBuiltinEthernetPorts(),
 			configDiagram.loadTemplate(),
@@ -243,7 +277,14 @@ return view.extend({
 		]);
 	},
 
-	async render([networkDevices, ethernetPorts]) {
+	async render([morseModeInfo, networkDevices, ethernetPorts]) {
+		if (morseModeInfo.persistent_morse_mode === 'sta') {
+			return [
+				E('h2', _('Wizard')),
+				E('section', { class: 'message' }, EXTENDER_MODE_MESSAGE),
+			];
+		}
+
 		this.bridgeMAC = morseuci.getFakeMorseMAC(networkDevices) ?? morseuci.getRandomMAC();
 		this.ethernetPorts = ethernetPorts;
 		this.diagram = E('morse-config-diagram');

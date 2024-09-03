@@ -6,6 +6,7 @@
 'use strict';
 
 import { cursor } from 'uci';
+import { popen } from 'fs';
 
 
 let uci;
@@ -156,9 +157,12 @@ function query() {
 	const device = get_morse_device();
 	const iface = device && get_best_halow_iface(device);
 	const morse_mode = get_morse_mode(iface);
+	const mm_mode_stream = popen('persistent_vars_storage.sh READ mm_mode');
+	const persistent_morse_mode = mm_mode_stream && trim(mm_mode_stream.read('all'));
 
 	return {
 		morse_mode,
+		persistent_morse_mode,
 		morse_mode_short_display: SHORT_MODE_NAMES[morse_mode] ?? morse_mode,
 		device,
 		iface,
