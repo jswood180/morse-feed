@@ -12,7 +12,9 @@
 
 function getZoneForNetwork(network) {
 	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes(network));
-	return zoneSection?.['.name'];
+	// Note that this returns the 'name' inside the zone (i.e. what is used in forwarding rules),
+	// not the section name '.name'.
+	return zoneSection?.['name'];
 }
 
 // Use F2 as prefix so that we know it's generated via this process (see below).
@@ -92,10 +94,13 @@ function getOrCreateZone(networkSectionId) {
 	}
 
 	let proposedName = networkSectionId, i = 0;
+	// Make sure we don't clash with either the section name or the actual name of the zone
+	// to avoid confusion.
 	while (uci.sections('firewall').some(s => [s['.name'], s.name].includes(proposedName))) {
 		proposedName = `${networkSectionId}${++i}`;
 	}
 
+	// NB It's not necessary to name the zone here, but I think it makes things clearer.
 	uci.add('firewall', 'zone', proposedName);
 	uci.set('firewall', proposedName, 'name', proposedName);
 	uci.set('firewall', proposedName, 'network', networkSectionId);

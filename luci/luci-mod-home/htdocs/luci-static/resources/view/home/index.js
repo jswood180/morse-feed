@@ -520,7 +520,7 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 
 	function getZoneForNetwork(network) {
 		const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes(network));
-		return zoneSection?.['.name'];
+		return zoneSection?.['name'];
 	}
 
 	// Hover on an interface highlights other cards.
