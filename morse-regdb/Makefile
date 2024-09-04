@@ -43,9 +43,29 @@ define Package/morse-regdb/description
 	Regulatory data for 802.11ah in a csv.
 endef
 
+define Package/morse-regdb/config
+	config MORSE_REGDB_COUNTRY_CODE_FILTER
+		string "Two letter country codes to filter in, separated by |"
+		default "ALL"
+		depends on PACKAGE_morse-regdb
+		help
+			Filter the country codes in the regulatory database.
+			Enter a list of two letter country codes separated by |.
+			Enter "ALL" to include all country codes.
+			This only filters the channels.csv file, which affects the choices
+			available in the UI but does not otherwise limit the capabilities
+			of the device.
+endef
+
 define Build/Prepare
 	$(if $(REGENERATE),$(call Build/Prepare/Default))
 endef
+
+ifeq ($(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER),ALL)
+FILTER := cat
+else
+FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^('$(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER)')$$$$/)'
+endif
 
 define Build/Compile
 	$(if $(REGENERATE),
@@ -54,7 +74,7 @@ define Build/Compile
 	)
 	mkdir -p $(PKG_BUILD_DIR)/artefacts
 	# Mash the 5g shim channels in.
-	python3 add_5g_shim_channels.py < artefacts/repo_channels.csv > $(PKG_BUILD_DIR)/artefacts/channels.csv
+	python3 add_5g_shim_channels.py < artefacts/repo_channels.csv | $(FILTER) > $(PKG_BUILD_DIR)/artefacts/channels.csv
 endef
 
 define Package/morse-regdb/install
