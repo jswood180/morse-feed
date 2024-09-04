@@ -46,21 +46,12 @@ endef
 define Package/morse-regdb/config
 	config MORSE_REGDB_COUNTRY_CODE_FILTER
 		string "Two letter country codes to filter in, separated by |"
+		default "ALL"
 		depends on PACKAGE_morse-regdb
 		help
 			Filter the country codes in the regulatory database.
 			Enter a list of two letter country codes separated by |.
-			Leave blank to include all countries.
-			This only filters the channels.csv file, which affects the choices
-			available in the UI but does not otherwise limit the capabilities
-			of the device.
-	config MORSE_REGDB_CHANNEL_NEGATIVE_FILTER
-		string "Channel number to filter out, separated by |"
-		depends on PACKAGE_morse-regdb
-		help
-			Filter out channels from regulatory database.
-			Enter a list channels separated by |.
-			Leave blank to include all channels.
+			Enter "ALL" to include all country codes.
 			This only filters the channels.csv file, which affects the choices
 			available in the UI but does not otherwise limit the capabilities
 			of the device.
@@ -70,18 +61,10 @@ define Build/Prepare
 	$(if $(REGENERATE),$(call Build/Prepare/Default))
 endef
 
-FILTER_ARG := $(strip $(subst ",,$(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER)))
-ifeq ($(FILTER_ARG),)
+ifeq ($(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER),ALL)
 FILTER := cat
 else
-FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^($(FILTER_ARG))$$$$/)'
-endif
-
-FILTER_ARG := $(strip $(subst ",,$(CONFIG_MORSE_REGDB_CHANNEL_NEGATIVE_FILTER)))
-ifeq ($(FILTER_ARG),)
-FILTER += | cat
-else
-FILTER += | awk -F, 'NR==1 || !($$$$3 ~ /^($(FILTER_ARG))$$$$/)'
+FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^('$(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER)')$$$$/)'
 endif
 
 define Build/Compile
@@ -90,11 +73,8 @@ define Build/Compile
 		python3 $(PKG_BUILD_DIR)/regdbconverter.py -v -f csv $(PKG_BUILD_DIR)/regdb_Sub-1_GHz.tsv > artefacts/repo_channels.csv
 	)
 	mkdir -p $(PKG_BUILD_DIR)/artefacts
-	# Mash the 5g shim channels in, filter out banned countries and channels,
-	# then add primary channels based on what remains.
-	set -o pipefail; python3 add_5g_shim_channels.py < artefacts/repo_channels.csv \
-	| $(FILTER) \
-	| python3 add_primary_channels.py > $(PKG_BUILD_DIR)/artefacts/channels.csv
+	# Mash the 5g shim channels in.
+	python3 add_5g_shim_channels.py < artefacts/repo_channels.csv | $(FILTER) > $(PKG_BUILD_DIR)/artefacts/channels.csv
 endef
 
 define Package/morse-regdb/install
