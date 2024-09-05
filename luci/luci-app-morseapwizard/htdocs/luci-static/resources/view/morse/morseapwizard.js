@@ -202,18 +202,25 @@ return view.extend({
 
 		const network_mode = this.data.wizard[this.data.wizard.device_mode === 'prplmesh' ? 'network_mode_prplmesh' : 'network_mode'];
 		switch (network_mode) {
-			case 'bridged': // lan/usblan on lan, everything else on 'wlan'
+			case 'bridged': // move HaLow and wan to wlan; don't use wan at all
 				morseuci.ensureNetworkExists('wlan');
 				uci.set('network', 'wlan', 'proto', 'dhcp');
 				morseuci.getOrCreateForwarding('lan', 'wlan');
 
 				// Set LAN devices
 				morseuci.setNetworkDevices('lan', this.ethernetPorts.filter(p => p.device !== 'wan').map(p => p.device));
+				// Keep 2.4 on LAN for setup; no use case for bridging this
+				// AP onto an existing network that will almost certainly already have 2.4.
+				for (const iface of uci.sections('wireless', 'wifi-iface')) {
+					if (iface['disabled'] !== '1' && iface['device'] !== morseDeviceName) {
+						uci.set('wireless', iface['.name'], 'network', 'lan');
+					}
+				}
 
 				// Set WLAN devices
 				morseuci.setNetworkDevices('wlan', ['wan']);
 				for (const iface of uci.sections('wireless', 'wifi-iface')) {
-					if (iface['disabled'] !== '1') {
+					if (iface['disabled'] !== '1' && iface['device'] === morseDeviceName) {
 						uci.set('wireless', iface['.name'], 'network', 'wlan');
 					}
 				}
