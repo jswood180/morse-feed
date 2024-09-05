@@ -6,7 +6,11 @@
 	local posix = require "nixio.fs"
 
 	local boardinfo = util.ubus("system", "board")
+	local morse_mode_short_display = "Unknown"
 	local modeinfo = util.ubus("morse-mode", "query")
+	if modeinfo then
+		morse_mode_short_display = modeinfo.morse_mode_short_display
+	end
 
 	local mode_link = ""
 	local mode_links = {"/cgi-bin/luci/admin/morseapwizard", "/cgi-bin/luci/admin/selectwizard"}
@@ -175,7 +179,7 @@
 							<div class="mode-status">
 								<span data-style="active">
 									<a href="<%= mode_link%>">
-										<%=modeinfo.morse_mode_short_display%>
+										<%=morse_mode_short_display%>
 									</a>
 								</span>
 							</div>
