@@ -174,11 +174,14 @@ body.uimode-advanced {
 		background: transparent;
 		border: 0;
 		padding: 0;
-		cursor: pointer;
 		color: inherit;
 
-		&:hover {
-			text-decoration: underline;
+		&.can-expand {
+			cursor: pointer;
+
+			&:hover {
+				text-decoration: underline;
+			}
 		}
 	}
 

@@ -477,8 +477,8 @@ async function createUplinkCard(netIface, hasQRCode) {
 					}),
 				])
 				: E('div', { class: 'main-counter' }, [
-					E('div', { class: 'big-number' }, netIface.isUp() ? '✔' : '✘'),
-					E('div', { class: 'big-text' }, netIface.isUp() ? _('Connected') : _('Disconnected')),
+					E('button', { class: 'big-number click-to-expand' }, netIface.isUp() ? '✔' : '✘'),
+					E('button', { class: 'big-text click-to-expand' }, netIface.isUp() ? _('Connected') : _('Disconnected')),
 				]),
 		],
 		maxContents: wifiNetwork && [
@@ -886,7 +886,6 @@ async function createPrplmeshControllerCard() {
 	const colorStyle = `color: ${agentOperational ? 'green' : 'red'}`;
 
 	const agentCount = prplmeshData?.countAgents() || 0;
-	const expandClass = agentCount > 0 ? 'click-to-expand' : '';
 
 	return new Card('prplmesh-controller', {
 		heading: 'EasyMesh Controller',
@@ -901,8 +900,8 @@ async function createPrplmeshControllerCard() {
 				document.querySelector('cli-wps-button[service=hostapd]') || E('cli-wps-button', { service: 'hostapd', state: 'available' }),
 			]),
 			E('div', { class: 'main-counter' }, [
-				E('button', { class: 'big-number ' + expandClass }, agentCount),
-				E('button', { class: 'big-text ' + expandClass }, _('Connected Agents')),
+				E('button', { class: 'big-number click-to-expand' }, agentCount),
+				E('button', { class: 'big-text click-to-expand' }, _('Connected Agents')),
 			]),
 		],
 		maxContents: agentCount > 0 && [
@@ -978,8 +977,11 @@ class Card {
 
 	renderCard() {
 		const smallContents = E('div', { class: 'small-contents' }, this.contents);
-		for (const e of smallContents.querySelectorAll('.click-to-expand')) {
-			e.onclick = () => this.expand();
+		if (this.maxContents) {
+			for (const e of smallContents.querySelectorAll('.click-to-expand')) {
+				e.onclick = () => this.expand();
+				e.classList.add('can-expand');
+			}
 		}
 
 		return E('section', {
