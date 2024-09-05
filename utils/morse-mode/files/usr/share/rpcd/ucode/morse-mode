@@ -153,6 +153,7 @@ function query() {
 		return null;
 	}
 	uci.load('prpmesh');
+	uci.load('matter');
 
 	const device = get_morse_device();
 	const iface = device && get_best_halow_iface(device);
