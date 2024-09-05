@@ -51,6 +51,10 @@ msgstr ""
 msgid "Network Mode"
 msgstr ""
 
+#: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:289
+msgid "No 2.4 Wi-Fi radio found"
+msgstr ""
+
 #: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:344
 #: luci/luci-app-morseapwizard/htdocs/luci-static/resources/view/morse/morseapwizard.js:355
 msgid "Wi-Fi devices will get an IP on this device's local network"

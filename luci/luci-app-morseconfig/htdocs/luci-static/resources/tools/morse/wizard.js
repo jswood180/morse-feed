@@ -178,11 +178,12 @@ function readSectionInfo() {
 	const ethInterfaceName = morseuci.getEthNetwork();
 
 	if (!morseDevice) {
-		throw new WizardConfigError('No HaLow radio found');
+		throw new WizardConfigError(_('No HaLow radio found'));
 	}
 
 	if (morseDevice && !uci.get('wireless', morseInterfaceName)) {
 		uci.add('wireless', 'wifi-iface', morseInterfaceName);
+		uci.set('wireless', morseInterfaceName, 'device', morseDeviceName);
 		uci.set('wireless', morseInterfaceName, 'mode', 'ap');
 		uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
 		uci.set('wireless', morseInterfaceName, 'ssid', morseuci.getDefaultSSID());
@@ -190,11 +191,10 @@ function readSectionInfo() {
 		uci.set('wireless', morseInterfaceName, 'key', morseuci.getDefaultWifiKey());
 		uci.set('wireless', morseInterfaceName, 'disabled', '1');
 	}
-	// Force sane device.
-	uci.set('wireless', morseInterfaceName, 'device', morseDeviceName);
 
 	if (wifiDevice && !uci.get('wireless', wifiApInterfaceName)) {
 		uci.add('wireless', 'wifi-iface', wifiApInterfaceName);
+		uci.set('wireless', wifiApInterfaceName, 'device', wifiDeviceName);
 		uci.set('wireless', wifiApInterfaceName, 'mode', 'ap');
 		uci.set('wireless', wifiApInterfaceName, 'encryption', 'psk2');
 		uci.set('wireless', wifiApInterfaceName, 'ssid', morseuci.getDefaultSSID());
@@ -202,8 +202,20 @@ function readSectionInfo() {
 		uci.set('wireless', wifiApInterfaceName, 'key', morseuci.getDefaultWifiKey());
 		uci.set('wireless', wifiApInterfaceName, 'disabled', '1');
 	}
-	// Force sane device.
-	uci.set('wireless', wifiApInterfaceName, 'device', morseDeviceName);
+
+	const checkDevices = {
+		[morseDeviceName]: [morseInterfaceName, morseBackhaulStaName, morseMeshApInterfaceName, morseMeshInterfaceName],
+		[wifiDeviceName]: [wifiApInterfaceName, wifiStaInterfaceName],
+	};
+
+	for (const [deviceName, ifaceNames] of Object.entries(checkDevices)) {
+		for (const ifaceName of ifaceNames) {
+			const iface = uci.get('wireless', ifaceName);
+			if (iface && iface.device != deviceName) {
+				throw new WizardConfigError(_('wifi-iface %s has device %s instead of %s').format(ifaceName, iface.device, deviceName));
+			}
+		}
+	}
 
 	return {
 		ethInterfaceName,

@@ -293,7 +293,7 @@ return view.extend({
 				const { wifiDevice } = wizard.readSectionInfo();
 
 				if (!wifiDevice) {
-					this.errorMessage = INVALID_CONFIG_MESSAGE.format('No 2.4 Wi-Fi radio found');
+					this.errorMessage = INVALID_CONFIG_MESSAGE.format(_('No 2.4 Wi-Fi radio found'));
 				}
 			} catch (e) {
 				this.errorMessage = INVALID_CONFIG_MESSAGE.format(e.message);
