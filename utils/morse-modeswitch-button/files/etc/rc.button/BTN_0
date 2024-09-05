@@ -21,7 +21,7 @@ timeout)
 	fi
 ;;
 released)
-	if [ "$SEEN" -lt 1 ]
+	if [ "$SEEN" -lt 2 ]
 	then
 		/morse/scripts/dpp_start.sh
 	elif [ "$SEEN" -ge 10 ]
