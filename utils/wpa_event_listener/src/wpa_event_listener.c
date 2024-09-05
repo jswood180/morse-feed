@@ -219,7 +219,8 @@ static void message_process(char *const message) {
                     apply_cached_confs();
                     clear_cached_confs();
                 } else if (strstr(value, "failed")) {
-                    led_failed();
+                    // We don't want to indicate DPP failed scenario and allow DPP to timeout
+                    printf("Avoid doing anything on DPP PB failure\n");
                 }
                 break;
             case TYPE_PB_STATUS:

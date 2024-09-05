@@ -6,6 +6,8 @@
 . /lib/netifd/netifd-wireless.sh
 . /etc/diag.sh
 
+dpp_start_time=/tmp/dpp_start_time
+
 #returns 0 if config is complete
 is_config_complete()
 {
@@ -100,6 +102,8 @@ case "$1" in
     ;;
     finished)
         finished
+        # Remove the DPP start timestamp file upon timeout or successful DPP completion.
+        rm $dpp_start_time
     ;;
     started)
         started

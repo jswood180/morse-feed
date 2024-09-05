@@ -6,6 +6,9 @@
 . /lib/functions.sh
 . /lib/functions/leds.sh
 
+# This file is removed upon DPP timeout/Success in wpa_s1g_dpp_action.sh script
+dpp_start_time=/tmp/dpp_start_time
+
 start_wpa_event_listener() {
 	# Start the wpa_event_listener to listen for DPP events. The
 	# wpa_event_listener will write the config on the STA side and control the
@@ -16,7 +19,7 @@ start_wpa_event_listener() {
 }
 
 _maybe_press_dpp_button() {
-	# For a morse, not disabled, AP or STA, send the button press to hostap.
+	# For a morse, not disabled, AP or STA, send the button press to hostap
 	local section_name="$1"
 	config_get device "$section_name" device
 	if [ "$(uci -q get "wireless.$device.type")" != "morse" ]; then
@@ -32,11 +35,19 @@ _maybe_press_dpp_button() {
 			echo "starting dpp due to button press"
 			start_wpa_event_listener -p /var/run/hostapd_s1g/
 			hostapd_cli_s1g dpp_push_button
+			if [ $? -eq 0 ]; then
+				# Update the dpp start time
+				echo "$current_uptime" > "$dpp_start_time"
+			fi
 		;;
 		"sta")
 			echo "starting dpp due to button press"
 			start_wpa_event_listener
 			wpa_cli_s1g dpp_push_button
+			if [ $? -eq 0 ]; then
+				# Update the dpp start time
+				echo "$current_uptime" > "$dpp_start_time"
+			fi
 		;;
 	esac 2>&1 | logger -t button -p daemon.notice
 }
@@ -47,5 +58,19 @@ maybe_press_dpp_button() {
 	config_load wireless
 	config_foreach _maybe_press_dpp_button wifi-iface
 }
+
+# Create a DPP timestamp file with the current uptime after the initial button press.
+# For subsequent button presses, check the timestamp to ensure at least 120 seconds have passed,
+# preventing rapid consecutive DPP events.
+current_uptime=$(awk '{print int($1)}' /proc/uptime)
+
+if [ -f $dpp_start_time ]; then
+	stored_uptime=$(cat "$dpp_start_time")
+	uptime_diff=$((current_uptime - stored_uptime))
+	if [ "$uptime_diff" -lt 120 ]; then
+		logger -t button -p daemon.notice "DPP button already pressed. Please wait for 2 minutes after the initial press."
+		return
+	fi
+fi
 
 maybe_press_dpp_button
