@@ -4046,7 +4046,6 @@ pre.command-output {
   .td.cbi-value-field,
   .th.cbi-section-table-cell,
   .td.cbi-section-table-cell {
-    flex-basis: auto;
     padding-top: 1rem;
   }
 
@@ -4237,11 +4236,24 @@ pre.command-output {
     }
   }
 
+  /* This flattens out description/values into multiple lines
+   * (so we don't have them LHS/RHS and running out of room)
+   */
   .cbi-value-field,
   .cbi-value-description {
     display: block !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
+  }
+
+  /* Tables 'compress' to a bunch of cells, and there's no intrinsic
+   * padding from the table itself, so let's make sure the contents
+   * are padded
+   */
+  .table .cbi-value-field,
+  .cbi-value-description {
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
   }
 
   [data-page="admin-system-admin-password"] .cbi-value-field {

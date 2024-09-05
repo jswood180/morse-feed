@@ -95,9 +95,9 @@ async function applyUciChangesImmediately() {
 	}
 }
 
-function tr(tag, items) {
-	return E('tr', { class: tag === 'th' ? 'tr cbi-section-table-titles' : 'tr' },
-		items.map(item => E(tag, { class: `${tag} cbi-section-table-cell` }, item)));
+function th(items) {
+	return E('tr', { class: 'tr cbi-section-table-titles' },
+		items.map(item => E('th', { class: `th cbi-section-table-cell` }, item)));
 }
 
 function makeClass(n) {
@@ -594,6 +594,24 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 		])));
 	}
 
+	const table = E('table', { class: 'table cbi-section-table' },
+		th([_('Network'), _('Devices'), _('Configuration')]));
+
+	cbi_update_table(table, networks.map(n => [
+		renderNetworkIfaceBadge(n),
+
+		E('div', {}, renderNetworkDevices(n)),
+
+		E('dl', [
+			E('dt', _('Protocol')),
+			E('dd', n.getI18n()),
+			E('dt', _('IPv4')),
+			E('dd', n.getIPAddr() ?? _('None')),
+			E('dt', _('IPv6')),
+			E('dd', n.getIP6Addr() ?? _('None')),
+		]),
+	]));
+
 	return new Card('networks', {
 		heading: _('Network Interfaces'),
 		link: { href: L.url('admin', 'network', 'network'), title: _('Network Interfaces') },
@@ -602,25 +620,7 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 			E('div', '→'),
 			E('div', {}, E('div', { class: 'devices-box' }, renderNetworkDevices(n))),
 		])),
-		maxContents: [
-			E('table', { class: 'table cbi-section-table' }, [
-				tr('th', [_('Network'), _('Devices'), _('Configuration')]),
-				...networks.map(n => tr('td', [
-					renderNetworkIfaceBadge(n),
-
-					E('div', {}, renderNetworkDevices(n)),
-
-					E('dl', [
-						E('dt', _('Protocol')),
-						E('dd', n.getI18n()),
-						E('dt', _('IPv4')),
-						E('dd', n.getIPAddr() ?? _('None')),
-						E('dt', _('IPv6')),
-						E('dd', n.getIP6Addr() ?? _('None')),
-					]),
-				])),
-			]),
-		],
+		maxContents: table,
 	});
 }
 
@@ -643,6 +643,21 @@ function createLocalNetworksCard(networks, dhcpLeases, hostHints) {
 		} else {
 			return Math.round(timeInSecs / 60) + _(' min(s)');
 		}
+	}
+
+	let table;
+	if (dhcpLeases.length > 0) {
+		table = E('table', { class: 'table cbi-section-table' }, th([
+			_('MAC Address'), _('Hostname'), _('IPv4'),
+			_('Expiry'), _('IPv6'), _('IPv6 Expiry'),
+		]));
+
+		cbi_update_table(table, dhcpLeases.map(lease => [
+			lease.macaddr, hostHints.getHostnameByMACAddr(lease.macaddr), lease.ipaddr,
+			expiry(lease.expires), lease.ip6addrs?.join(', '), expiry(lease.ip6expires),
+		]));
+	} else {
+		table = E('em', _('No active leases'));
 	}
 
 	return new Card('localnetworks', {
@@ -669,13 +684,7 @@ function createLocalNetworksCard(networks, dhcpLeases, hostHints) {
 				E('dt', _('IPv6')),
 				E('dd', ipv6addrs.length > 0 ? ipv6addrs.join(', ') : _('None')),
 			]),
-			dhcpLeases.length > 0
-				? E('table', { class: 'table cbi-section-table' }, [
-					tr('th', [_('MAC Address'), _('Hostname'), _('IPv4'), _('Expiry'), _('IPv6'), _('IPv6 Expiry')]),
-					...dhcpLeases.map(lease =>
-						tr('td', [lease.macaddr, hostHints.getHostnameByMACAddr(lease.macaddr), lease.ipaddr, expiry(lease.expires), lease.ip6addrs?.join(', '), expiry(lease.ip6expires)])),
-				])
-				: E('em', _('No active leases')),
+			table,
 		],
 	});
 }
@@ -756,6 +765,21 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 		]);
 	}
 
+	let table;
+	if (associatedDevices.length > 0) {
+		table = E('table', { class: 'table cbi-section-table' }, th([
+			_('MAC Address'), hasHostname && _('Hostname'), hasIp && _('IPv4'), hasIp6 && _('IPv6'),
+			_('Time connected'), _('Noise'), _('Signal'),
+		].filter(t => t)));
+
+		cbi_update_table(table, associatedDevices.map(d => [
+			d.mac, hasHostname && d.hostname, hasIp && d.ip, hasIp6 && d.ip6,
+			d.connected_time + _(' min(s)'), d.noise + _(' dBm'), d.signal + _(' dBm'),
+		].filter(t => t)));
+	} else {
+		table = E('em', _('No active devices'));
+	}
+
 	return new Card(`wifi-${wifiName}`, {
 		heading: _('Access Point') + ` (${wifiName})`,
 		link: { href: L.url('admin', 'network', 'wireless'), title: _('Wireless Configuration') },
@@ -789,12 +813,7 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 			].filter(e => e)),
 			E('h2', { style: 'margin: 0' }, _('Associated devices')),
 			connectMethods,
-			associatedDevices.length > 0
-				? E('table', { class: 'table cbi-section-table' }, [
-					tr('th', [_('MAC Address'), hasHostname && _('Hostname'), hasIp && _('IPv4'), hasIp6 && _('IPv6'), _('Time connected'), _('Noise'), _('Signal')].filter(t => t)),
-					...associatedDevices.map(d => tr('td', [d.mac, hasHostname && d.hostname, hasIp && d.ip, hasIp6 && d.ip6, d.connected_time + _(' min(s)'), d.noise + _(' dBm'), d.signal + _(' dBm')].filter(t => t))),
-				])
-				: E('em', _('No active devices')),
+			table,
 		].filter(e => e),
 	});
 }
