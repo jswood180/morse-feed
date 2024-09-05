@@ -773,7 +773,7 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 		].filter(t => t)));
 
 		cbi_update_table(table, associatedDevices.map(d => [
-			d.mac, hasHostname && d.hostname, hasIp && d.ip, hasIp6 && d.ip6,
+			d.mac, d.hostname ?? (hasHostname && ' '), d.ip ?? (hasIp && ' '), d.ip6 ?? (hasIp6 && ' '),
 			d.connected_time + _(' min(s)'), d.noise + _(' dBm'), d.signal + _(' dBm'),
 		].filter(t => t)));
 	} else {
