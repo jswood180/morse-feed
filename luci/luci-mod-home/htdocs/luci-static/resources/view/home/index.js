@@ -1149,10 +1149,21 @@ return view.extend({
 				return network;
 			})));
 
-		const cards = [
-			createSystemCard(boardinfo),
-			createModeCard(morseMode, ethernetPorts),
-		];
+		const cards = [];
+		const nonHaLowAPCards = [];
+
+		// List HaLow APs first
+		// TODO: mesh cards (APP-3001)
+		for (const wifiNetwork of wifiNetworks) {
+			if (!wifiNetwork.isDisabled() && wifiNetwork.isUp() && wifiNetwork.getMode() === 'ap' && wifiNetwork.getNetwork()) {
+				const apCard = createAccessPointCard(wifiNetwork, hostHints);
+				if (isHaLow(wifiNetwork)) {
+					cards.push(apCard);
+				} else {
+					nonHaLowAPCards.push(apCard);
+				}
+			}
+		}
 
 		if (uci.get('prplmesh', 'config', 'enable') === '1') {
 			cards.push(
@@ -1162,6 +1173,7 @@ return view.extend({
 		}
 
 		const localNetworks = [];
+		let uplink;
 		for (const netIface of networks) {
 			const device = netIface.getL2Device();
 			if (!device || (device.isBridge() && !device.getPorts())) {
@@ -1172,17 +1184,9 @@ return view.extend({
 
 			const name = netIface.getName();
 			if (wanNetworks[name] || wan6Networks[name] || netIface.getProtocol() === 'dhcp') {
-				cards.push(await createUplinkCard(netIface, hasQRCode));
+				uplink = netIface;
 			} else if (netIface.getProtocol() === 'static' && netIface.getDevice()?.getName() !== 'lo') {
 				localNetworks.push(netIface);
-			}
-		}
-
-		// List access points separately
-		// (STAs should generally be captured by 'upstream' above).
-		for (const wifiNetwork of wifiNetworks) {
-			if (!wifiNetwork.isDisabled() && wifiNetwork.isUp() && wifiNetwork.getMode() === 'ap' && wifiNetwork.getNetwork()) {
-				cards.push(createAccessPointCard(wifiNetwork, hostHints));
 			}
 		}
 
@@ -1190,7 +1194,16 @@ return view.extend({
 			cards.push(createLocalNetworksCard(localNetworks, dhcpLeases, hostHints));
 		}
 
+		if (uplink) {
+			cards.push(await createUplinkCard(uplink, hasQRCode));
+		}
+
+		// List non-HaLow APs later
+		cards.push(...nonHaLowAPCards);
+
+		cards.push(createModeCard(morseMode, ethernetPorts));
 		cards.push(createNetworkInterfacesCard(networks, wifiDevices));
+		cards.push(createSystemCard(boardinfo));
 
 		return cards;
 	},
