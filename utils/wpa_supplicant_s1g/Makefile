@@ -50,7 +50,6 @@ MMWPA_SUPPLICANT_CONFIG_ENABLE = \
 	CONFIG_READLINE \
 	CONFIG_IEEE80211W \
 	CONFIG_INTERNAL_LIBTOMMATH_FAST \
-	CONFIG_CTRL_IFACE_DBUS_INTRO \
 	CONFIG_DEBUG_SYSLOG \
 	CONFIG_INTERWORKING \
 	CONFIG_HS20 \
@@ -64,8 +63,6 @@ MMWPA_SUPPLICANT_CONFIG_ENABLE = \
 	CONFIG_TESTING_OPTIONS \
 	CONFIG_PMKSA_CACHE_EXTERNAL \
 	CONFIG_WNM \
-	CONFIG_CTRL_IFACE_DBUS_NEW \
-	CONFIG_CTRL_IFACE_DBUS_INTRO \
 	CONFIG_IPV6
 
 MMWPA_SUPPLICANT_CONFIG_DISABLE = \
@@ -90,12 +87,16 @@ ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_EAP),y)
 		CONFIG_EAP_PWD
 endif
 
+ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_DBUS),y)
+	MMWPA_SUPPLICANT_CONFIG_ENABLE += CONFIG_CTRL_IFACE_DBUS_NEW
+endif
+
 define Package/wpa_supplicant_s1g
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=WirelessAPD
   TITLE:=Morse Micro HaLow wpa_supplicant
-  DEPENDS:= +kmod-morse +libnl +libopenssl +libubus +dbus +libdbus
+  DEPENDS:= +kmod-morse +libnl +libopenssl +libubus +MORSE_WPA_SUPPLICANT_S1G_DBUS:dbus +MORSE_WPA_SUPPLICANT_S1G_DBUS:libdbus
   USERID:=network=101:network=101
   PROVIDES:=wpa_supplicant_s1g
 endef
@@ -136,7 +137,10 @@ TARGET_CPPFLAGS := \
 	-D_GNU_SOURCE
 
 TARGET_LDFLAGS += -lnl-3 -lnl-genl-3 -lnl-route-3
-TARGET_LDFLAGS += -lm -lpthread -lcrypto -lssl -ldbus-1
+TARGET_LDFLAGS += -lm -lpthread -lcrypto -lssl
+ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_DBUS),y)
+	TARGET_LDFLAGS += -ldbus-1
+endif
 
 define Build/RunMake
 	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" \
@@ -159,10 +163,13 @@ endef
 
 define Package/wpa_supplicant_s1g/install
 	$(INSTALL_DIR) $(1)/sbin
-	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/wpa_supplicant_s1g $(1)/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/wpa_cli_s1g $(1)/sbin/
+
+ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_DBUS),y)
+	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wpa_supplicant/dbus/dbus-wpa_supplicant_s1g.conf $(1)/etc/dbus-1/system.d/wpa_supplicant_s1g.conf
+endif
 endef
 
 define Package/libwpa_client/install
