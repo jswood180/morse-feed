@@ -36,7 +36,6 @@ _maybe_press_dpp_button() {
 		"sta")
 			echo "starting dpp due to button press"
 			start_wpa_event_listener
-			wpa_cli_s1g disconnect
 			wpa_cli_s1g dpp_push_button
 		;;
 	esac 2>&1 | logger -t button -p daemon.notice
