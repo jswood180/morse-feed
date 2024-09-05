@@ -222,12 +222,7 @@ function isNormalNetworkIface(netIface) {
 }
 
 function getWifiIfaceModeI18n(wifiIface) {
-	let mode = wifiIface.mode;
-	if (['ap', 'sta'].includes(mode) && wifiIface.wds === '1') {
-		mode += '-wds';
-	}
-
-	return WIFI_MODE_NAMES[mode] ?? _('Unknown');
+	return WIFI_MODE_NAMES[wifiIface.mode] ?? _('Unknown');
 }
 
 return view.extend({
