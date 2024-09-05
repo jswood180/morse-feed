@@ -52,7 +52,7 @@ body.uimode-advanced {
 
 .cards {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(325px, 1fr));
 	grid-gap: 30px;
 	max-width: var(--max-content-width);
 	margin: auto;
