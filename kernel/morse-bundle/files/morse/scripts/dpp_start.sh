@@ -6,6 +6,9 @@
 . /lib/functions.sh
 . /lib/functions/leds.sh
 
+has_ap_interface=0
+has_sta_interface=0
+
 # This file is removed upon DPP timeout/Success in wpa_s1g_dpp_action.sh script
 dpp_start_time=/tmp/dpp_start_time
 
@@ -18,8 +21,7 @@ start_wpa_event_listener() {
 	wpa_event_listener "$@" -a /lib/netifd/morse/wpa_s1g_dpp_action.sh -B
 }
 
-_maybe_press_dpp_button() {
-	# For a morse, not disabled, AP or STA, send the button press to hostap
+_check_available_interfaces() {
 	local section_name="$1"
 	config_get device "$section_name" device
 	if [ "$(uci -q get "wireless.$device.type")" != "morse" ]; then
@@ -32,31 +34,45 @@ _maybe_press_dpp_button() {
 	config_get mode "$section_name" mode
 	case "$mode" in
 		"ap")
-			echo "starting dpp due to button press"
-			start_wpa_event_listener -p /var/run/hostapd_s1g/
-			hostapd_cli_s1g dpp_push_button
-			if [ $? -eq 0 ]; then
-				# Update the dpp start time
-				echo "$current_uptime" > "$dpp_start_time"
-			fi
+			has_ap_interface=1
 		;;
 		"sta")
-			echo "starting dpp due to button press"
-			start_wpa_event_listener
-			wpa_cli_s1g dpp_push_button
-			if [ $? -eq 0 ]; then
-				# Update the dpp start time
-				echo "$current_uptime" > "$dpp_start_time"
-			fi
+			has_sta_interface=1
 		;;
-	esac 2>&1 | logger -t button -p daemon.notice
+	esac
 }
 
-# Check that the device is in a DPP mode (AP or STA) and tell hostap that the
+perform_dpp_actions() {
+	dpp_push_btn_cmd=""
+	if [ "$has_ap_interface" -eq 1 ]; then
+		start_wpa_event_listener -p /var/run/hostapd_s1g/
+		dpp_push_btn_cmd="hostapd_cli_s1g"
+	elif [ "$has_sta_interface" -eq 1 ]; then
+		start_wpa_event_listener
+		dpp_push_btn_cmd="wpa_cli_s1g"
+	else
+		logger -t button -p daemon.error "No available interface to start DPP"
+	fi
+
+	if [ -n "$dpp_push_btn_cmd" ]; then
+		$dpp_push_btn_cmd dpp_push_button
+		# Check the result of the dpp push button command
+		if [ $? -eq 0 ]; then
+			logger -t button -p daemon.notice "starting DPP due to button press"
+			# Update the dpp start time
+			echo "$current_uptime" > "$dpp_start_time"
+		fi
+	fi
+}
+
+# Check that the device is in a DPP mode (AP or STA) and tell hostap/wpa_supplicant that the
 # button is pressed if so.
+# If both AP and STA interfaces are available, prioritize starting DPP 
+# on the AP interface, which also applies to the EasyMesh agent scenario.
 maybe_press_dpp_button() {
 	config_load wireless
-	config_foreach _maybe_press_dpp_button wifi-iface
+	config_foreach _check_available_interfaces wifi-iface
+	perform_dpp_actions
 }
 
 # Create a DPP timestamp file with the current uptime after the initial button press.
