@@ -328,12 +328,12 @@ return view.extend({
 		const makeOptionWithInfo = (key, val, info) => {
 			o.value(key, E('span', {}, [
 				E('span', { style: 'width: 12rem; display: inline-block;' }, val),
-				E('em', { style: 'margin-left: 1rem; width: 20rem; white-space: nowrap;' }, '← ' + info),
+				E('em', { style: 'margin-left: 1rem; display: inline-block; width: 14rem; white-space: nowrap;' }, '← ' + info),
 			]));
 		};
-		makeOptionWithInfo('standard', _('Access Point'), _('fastest mode if <4km range required'));
-		makeOptionWithInfo('mesh', _('802.11s Mesh Gate'), _('use multiple devices for even longer range'));
-		makeOptionWithInfo('prplmesh', _('EasyMesh Controller/Agent'), _('use multiple devices for even longer range'));
+		makeOptionWithInfo('standard', _('Access Point'), _('fastest mode if <4km range'));
+		makeOptionWithInfo('mesh', _('802.11s Mesh Gate'), _('use extra devices for more range'));
+		makeOptionWithInfo('prplmesh', _('EasyMesh Controller/Agent'), _('use extra devices for more range'));
 		o.onchange = () => this.saveToUciCache();
 		o.default = 'standard';
 
