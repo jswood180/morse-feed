@@ -434,22 +434,9 @@ async function createUplinkCard(netIface, wifiNetworks, hasQRCode) {
 		speed = device.getSpeed();
 	}
 
+	const isUp = netIface.isUp() && device.isUp() && device.getCarrier();
 	const ips = [netIface.getIPAddr(), netIface.getIP6Addr()].filter(e => e);
 	const qrcodeDppMode = hasQRCode && wifiNetwork && isHaLow(wifiNetwork) && wifiNetwork.get('dpp') === '1';
-
-	let isUp = device.isUp();
-	if (wifiNetwork && wifiNetwork.getMode() === 'sta') {
-		// Our existing wifi networks have an assoclist patched in, which is
-		// useful for determining up-ness of STAs (i.e. if it's not associated,
-		// it's not 'up' for the purposes of the uplink card).
-		for (const existingWifiNetwork of wifiNetworks) {
-			if (existingWifiNetwork.getName() === wifiNetwork.getName()) {
-				if (existingWifiNetwork.assoclist?.length === 0) {
-					isUp = false;
-				}
-			}
-		}
-	}
 
 	let connectMethods;
 	if (wifiNetwork && wifiNetwork.getMode() === 'sta') {
@@ -602,7 +589,7 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 			E('div', { class: 'ifacebox-head' }, d.getName()),
 			E('div', { class: 'ifacebox-body' }, [
 				// From render_iface in luci-mod-network
-				E('img', { src: L.resource('icons/%s%s.png').format(d.getType() || 'ethernet', d.isUp() ? '' : '_disabled') }),
+				E('img', { src: L.resource('icons/%s%s.png').format(d.getType() || 'ethernet', d.getCarrier() ? '' : '_disabled') }),
 			]),
 		])));
 	}
