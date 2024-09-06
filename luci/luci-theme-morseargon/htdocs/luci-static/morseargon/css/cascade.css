@@ -993,6 +993,20 @@ body.uimode-normal {
   .status [data-indicator="poll-status"] {
     display: none;
   }
+
+  .cbi-page-actions {
+    .cbi-button-save {
+      display: none;
+    }
+
+    .cbi-button-reset {
+      display: none;
+    }
+  }
+
+  a.advanced-config {
+    display: none;
+  }
 }
 
 body.uimode-advanced {
@@ -1002,10 +1016,6 @@ body.uimode-advanced {
     &[data-title="Advanced"] > a:first-child::before {
       content: var(--toggle-on);
     }
-  }
-
-  header .status span[data-indicator="poll-status"] {
-    display: inline-block;
   }
 }
 

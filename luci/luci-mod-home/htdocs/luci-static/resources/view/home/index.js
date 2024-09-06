@@ -1024,7 +1024,7 @@ class Card {
 				this.link && E('a', {
 					href: this.link.href,
 					title: this.link.title,
-					class: 'bs-icon bs-icon-settings-cog',
+					class: 'bs-icon bs-icon-settings-cog advanced-config',
 				}),
 				E('div', { class: 'collapse bs-icon bs-icon-x-lg', title: _('Restore'), click: () => Card.collapse() }),
 			].filter(e => e)),

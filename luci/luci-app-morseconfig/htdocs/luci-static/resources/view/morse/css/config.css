@@ -1,3 +1,11 @@
+body.uimode-normal {
+	/* Disable header links to luci config pages. */
+	a.cbi-title-ref {
+		pointer-events: none;
+		color: inherit;
+	}
+}
+
 #view h1 {
 	margin: 0;
 }
