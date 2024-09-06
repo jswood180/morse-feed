@@ -372,3 +372,7 @@ dd {
 		border-bottom: 2px dotted black;
 	}
 }
+
+.no-transition * {
+	transition: none !important;
+}

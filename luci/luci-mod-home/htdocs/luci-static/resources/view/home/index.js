@@ -1112,6 +1112,7 @@ return view.extend({
 
 			// Save activeElement so we can refocus after rerender.
 			const view = document.getElementById('view');
+			view.classList.add('no-transition');
 			const activeElement = document.activeElement;
 
 			const cards = await this.createCards({ ...onceLoadData, ...repeatLoadData });
@@ -1133,6 +1134,7 @@ return view.extend({
 			if (activeElement && document.contains(activeElement)) {
 				activeElement.focus();
 			}
+			setTimeout(() => view.classList.remove('no-transition'), 0);
 		});
 
 		document.getElementById('maincontent').append(
