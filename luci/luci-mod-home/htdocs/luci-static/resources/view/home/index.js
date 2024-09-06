@@ -438,7 +438,7 @@ async function createUplinkCard(netIface, wifiNetworks, hasQRCode) {
 	const qrcodeDppMode = hasQRCode && wifiNetwork && isHaLow(wifiNetwork) && wifiNetwork.get('dpp') === '1';
 
 	let isUp = device.isUp();
-	if (wifiNetwork.getMode() === 'sta') {
+	if (wifiNetwork && wifiNetwork.getMode() === 'sta') {
 		// Our existing wifi networks have an assoclist patched in, which is
 		// useful for determining up-ness of STAs (i.e. if it's not associated,
 		// it's not 'up' for the purposes of the uplink card).
