@@ -1110,13 +1110,9 @@ return view.extend({
 				repeatLoadData = await this.repeatLoad();
 			}
 
-			// Save textbox cursor position so we can restore after re-render.
+			// Save activeElement so we can refocus after rerender.
 			const view = document.getElementById('view');
 			const activeElement = document.activeElement;
-			let textboxCursorPosition;
-			if (activeElement && activeElement.tagName === 'INPUT' && ['text', 'password'].includes(activeElement.type)) {
-				textboxCursorPosition = activeElement.selectionStart;
-			}
 
 			const cards = await this.createCards({ ...onceLoadData, ...repeatLoadData });
 			// i.e. force us to regen next time through the poll.
@@ -1134,10 +1130,8 @@ return view.extend({
 
 			view.replaceChildren(E('div', { class: 'cards' }, cards.map(c => c.renderCard())));
 
-			// Restore textboxCursorPosition
-			if (textboxCursorPosition && document.contains(activeElement)) {
+			if (activeElement && document.contains(activeElement)) {
 				activeElement.focus();
-				activeElement.setSelectionRange(textboxCursorPosition, textboxCursorPosition);
 			}
 		});
 
