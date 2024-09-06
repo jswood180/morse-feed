@@ -534,6 +534,7 @@ h5 {
         .input-group {
           margin-bottom: 1.25rem;
           position: relative;
+          display: flex;
 
           &::before {
             font-family: var(--icon-font) !important;
@@ -549,7 +550,7 @@ h5 {
             position: absolute;
             z-index: 100;
             left: 10px;
-            top: 10px;
+            top: 20px;
           }
 
           &::after {
@@ -566,7 +567,7 @@ h5 {
             position: absolute;
             z-index: 100;
             right: 10px;
-            top: 10px;
+            top: 20px;
           }
 
           .border {
@@ -605,6 +606,7 @@ h5 {
           .cbi-input-password {
             margin-bottom: 2rem;
             position: relative;
+            flex-grow: 1;
           }
         }
 
@@ -618,6 +620,7 @@ h5 {
 
         .passreveal-icon::after {
           content: var(--eye);
+          cursor: pointer;
         }
       }
 
