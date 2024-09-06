@@ -266,8 +266,7 @@ function createSystemCard(boardinfo) {
 // However, to support establishing wifi connections (including credential setting),
 // we have a persistent state here. Unfortunately, this means that we need to messily
 // update parts of the DOM at arbitrary times. Probably should be using templates.
-async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork) {
-	const netIface = wifiNetwork.getNetwork();
+async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) {
 	const map = new form.Map('wireless');
 	const s = map.section(form.NamedSection, wifiNetwork.getName());
 	s.option(morseui.SSIDListScan, 'ssid', _('SSID'));
@@ -307,8 +306,8 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork) {
 	let element;
 	element = E('details', {
 		id,
-		'open': netIface.isUp() ? null : '', // Show by default if we're not connected.
-		'data-isup': netIface.isUp(),
+		'open': isUp ? null : '', // Show by default if we're not connected.
+		'data-isup': isUp,
 		'data-wifinetworkname': wifiNetwork.getName(),
 	}, [
 		E('summary', _('Connect to Access Point')),
@@ -393,20 +392,20 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork) {
 // This is the 'messily update the existing JS to obey the current state'.
 // TODO: I have seen wifiNetwork be in a bad state where it hasn't loaded
 // data properly, and netIface is empty. Hence the guards. Bug in network.js?
-async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods) {
+async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods, isUp) {
 	const wifiNetwork = await network.getWifiNetwork(connectMethods.dataset.wifinetworkname);
 	const netIface = wifiNetwork.getNetwork();
 	if (netIface) {
-		if (connectMethods.dataset.isup === 'false' && netIface.isUp()) {
+		if (connectMethods.dataset.isup === 'false' && isUp) {
 			// Close if we move from unconnected to connected as a cheap way to
 			// show people that the state has changed.
 			connectMethods.removeAttribute('open');
-		} else if (connectMethods.dataset.isup === 'true' && !netIface.isUp()) {
+		} else if (connectMethods.dataset.isup === 'true' && !isUp) {
 			// Show if we do the reverse.
 			connectMethods.setAttribute('open', '');
 		}
 
-		connectMethods.dataset.isup = netIface.isUp();
+		connectMethods.dataset.isup = isUp;
 	}
 
 	if (isHaLow(wifiNetwork) && hasQRCode) {
@@ -420,9 +419,9 @@ async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods) {
 	}
 }
 
-async function createUplinkCard(netIface, hasQRCode) {
+async function createUplinkCard(netIface, wifiNetworks, hasQRCode) {
 	const device = getBestDevice(netIface);
-	const wifiNetwork = device.getWifiNetwork();
+	let wifiNetwork = device.getWifiNetwork();
 
 	let method, speed, ssid, meshId;
 	if (wifiNetwork) {
@@ -438,6 +437,20 @@ async function createUplinkCard(netIface, hasQRCode) {
 	const ips = [netIface.getIPAddr(), netIface.getIP6Addr()].filter(e => e);
 	const qrcodeDppMode = hasQRCode && wifiNetwork && isHaLow(wifiNetwork) && wifiNetwork.get('dpp') === '1';
 
+	let isUp = device.isUp();
+	if (wifiNetwork.getMode() === 'sta') {
+		// Our existing wifi networks have an assoclist patched in, which is
+		// useful for determining up-ness of STAs (i.e. if it's not associated,
+		// it's not 'up' for the purposes of the uplink card).
+		for (const existingWifiNetwork of wifiNetworks) {
+			if (existingWifiNetwork.getName() === wifiNetwork.getName()) {
+				if (existingWifiNetwork.assoclist?.length === 0) {
+					isUp = false;
+				}
+			}
+		}
+	}
+
 	let connectMethods;
 	if (wifiNetwork && wifiNetwork.getMode() === 'sta') {
 		// This bit of trickery is to avoid the refresh on the add-device-info,
@@ -446,8 +459,8 @@ async function createUplinkCard(netIface, hasQRCode) {
 		// - whether we're in the middle of DPP (though this is just a timeout now)
 		// - whether we've revealed the password
 		const id = `client-connect-methods-${wifiNetwork.getDevice().getName()}`;
-		connectMethods = document.getElementById(id) || await renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork);
-		updateUplinkWifiConnectMethods(hasQRCode, connectMethods);
+		connectMethods = document.getElementById(id) || await renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp);
+		updateUplinkWifiConnectMethods(hasQRCode, connectMethods, isUp);
 	}
 
 	return new Card(`uplink-${netIface.getName()}`, {
@@ -477,8 +490,8 @@ async function createUplinkCard(netIface, hasQRCode) {
 					}),
 				])
 				: E('div', { class: 'main-counter' }, [
-					E('button', { class: 'big-number click-to-expand' }, netIface.isUp() ? '✔' : '✘'),
-					E('button', { class: 'big-text click-to-expand' }, netIface.isUp() ? _('Connected') : _('Disconnected')),
+					E('button', { class: 'big-number click-to-expand' }, isUp ? '✔' : '✘'),
+					E('button', { class: 'big-text click-to-expand' }, isUp ? _('Connected') : _('Disconnected')),
 				]),
 		],
 		maxContents: wifiNetwork && [
@@ -495,8 +508,8 @@ async function createUplinkCard(netIface, hasQRCode) {
 				speed > 0 && E('dd', `${speed} Mbps`),
 				E('dt', _('Connected')),
 				E('dd', {
-					style: `color: ${netIface.isUp() ? 'green' : 'red'}`,
-				}, netIface.isUp() ? _('yes') : _('no')),
+					style: `color: ${isUp ? 'green' : 'red'}`,
+				}, isUp ? _('yes') : _('no')),
 			].filter(e => e)),
 			// Currently, we only support DPP on HaLow (custom script).
 			connectMethods,
@@ -1216,7 +1229,7 @@ return view.extend({
 		}
 
 		if (uplink) {
-			cards.push(await createUplinkCard(uplink, hasQRCode));
+			cards.push(await createUplinkCard(uplink, wifiNetworks, hasQRCode));
 		}
 
 		// List non-HaLow APs later
