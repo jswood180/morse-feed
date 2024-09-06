@@ -126,7 +126,7 @@ function get_best_halow_iface(device) {
 	}
 
 	const IFACE_ORDER = ['sta', 'mesh', 'adhoc', 'ap', 'monitor'];
-	sort(ifaces, (a, b) => IFACE_ORDER.index(a) - IFACE_ORDER.index(b));
+	sort(ifaces, (a, b) => index(IFACE_ORDER, a.mode) - index(IFACE_ORDER, b.mode));
 
 	return ifaces[0];
 }
