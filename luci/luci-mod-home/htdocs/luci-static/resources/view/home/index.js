@@ -956,16 +956,9 @@ class Card {
 	expand() {
 		const modalOverlay = document.getElementById('homepage-modal-overlay');
 		const modal = modalOverlay.querySelector('div.modal');
+		modal.style.top = `${modalOverlay.parentElement.parentElement.scrollTop}px`;
 		modal.replaceChildren(this.renderMaxCard());
 		modalOverlay.classList.add('active');
-
-		if (modal.getBoundingClientRect().bottom > window.innerHeight) {
-			modal.scrollIntoView(false);
-		}
-
-		if (modal.getBoundingClientRect().top < 0) {
-			modal.scrollIntoView();
-		}
 	}
 
 	static collapse() {
