@@ -1428,7 +1428,7 @@ table {
 
 table,
 .table {
-  overflow-y: hidden;
+  overflow: visible;
   width: 100%;
   font-size: 90%;
 }
