@@ -3117,12 +3117,13 @@ span[data-tooltip] .label {
   z-index: 1000;
   left: -1000px;
   transition: opacity 0.25s ease-out;
-  white-space: pre;
+  white-space: pre-wrap;
   pointer-events: none;
   opacity: 0;
+  border: 1px solid black;
   border-radius: 3px;
-  background: #fff;
-  box-shadow: 0 0 2px #444;
+  background: var(--background-color-high);
+  padding: 3px 5px;
 }
 
 .cbi-tooltip-container:hover .cbi-tooltip {

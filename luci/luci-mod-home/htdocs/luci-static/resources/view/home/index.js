@@ -339,9 +339,9 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) 
 						E('div', { class: 'spinning', hidden: '', style: 'height: 100%; width: 100%' }),
 					]),
 					E('img', {
-						style: 'cursor: help',
-						title: _('Scan this QR Code in the app to connect this device to your Access Point.'),
-						src: DPP_QRCODE_PATH,
+						'style': 'cursor: help',
+						'data-tooltip': _('Scan this QR Code in the app to connect this device to your Access Point.'),
+						'src': DPP_QRCODE_PATH,
 					}),
 				]),
 				isHaLow(wifiNetwork) && E('dt', _('DPP Push button')),
@@ -472,9 +472,9 @@ async function createUplinkCard(netIface, wifiNetworks, hasQRCode) {
 			qrcodeDppMode
 				? E('div', { class: 'main-image' }, [
 					E('img', {
-						style: 'cursor: help',
-						title: _('Scan this QR Code in the app to connect this device to your HaLow Point'),
-						src: DPP_QRCODE_PATH,
+						'style': 'cursor: help',
+						'data-tooltip': _('Scan this QR Code in the app to connect this device to your HaLow Point'),
+						'src': DPP_QRCODE_PATH,
 					}),
 				])
 				: E('div', { class: 'main-counter' }, [
@@ -576,7 +576,7 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 		return addHover(E('div', {
 			'class': 'zonebadge network-name',
 			'data-highlight': makeClass(n),
-			'title': getNetworkTitle(n),
+			'data-tooltip': getNetworkTitle(n),
 			'style': firewall.getZoneColorStyle(getZoneForNetwork(n.getName())),
 		}, n.getName()));
 	}
@@ -585,7 +585,7 @@ function createNetworkInterfacesCard(networks, wifiDevices) {
 		return getL2Devices(n).map(d => addHover(E('div', {
 			'class': 'ifacebox',
 			'data-highlight': makeClass(d),
-			'title': getDeviceTitle(d),
+			'data-tooltip': getDeviceTitle(d),
 		}, [
 			E('div', { class: 'ifacebox-head' }, d.getName()),
 			E('div', { class: 'ifacebox-body' }, [

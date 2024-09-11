@@ -431,7 +431,7 @@ return view.extend({
 			Change the mode of your Wi-Fi interface. To enable HaLow Wi-Fi extenders, you should select WDS (Wireless Distribution System)
 			modes for Access Points and Clients (Stations).
 		`).replace(/[\t\n ]+/g, ' ');
-		option = section.option(form.ListValue, 'mode', E('span', { class: 'show-info', title: MODE_TOOLTIP }, _('Mode')));
+		option = section.option(form.ListValue, 'mode', E('span', { 'class': 'show-info', 'data-tooltip': MODE_TOOLTIP }, _('Mode')));
 		for (const [k, v] of Object.entries(isMorse ? HALOW_WIFI_MODE_NAMES : WIFI_MODE_NAMES)) {
 			option.value(k, v);
 		}
@@ -504,7 +504,7 @@ return view.extend({
 
 		if (this.hasQRCode && isMorse) {
 			const DPP_TOOLTIP = _('This enables DPP via QRCode for clients (access points automatically support DPP).');
-			option = section.option(form.Flag, 'dpp', E('span', { class: 'show-info', title: DPP_TOOLTIP }, _('DPP')));
+			option = section.option(form.Flag, 'dpp', E('span', { 'class': 'show-info', 'data-tooltip': DPP_TOOLTIP }, _('DPP')));
 			option.depends({ '!contains': true, 'mode': 'sta' });
 		}
 
@@ -665,9 +665,9 @@ return view.extend({
 				}
 			}
 
-			return Object.entries(wirelessDevices).map(([name, tooltips]) => {
-				return E('span', { class: 'show-info', title: tooltips.join('\n') }, name);
-			});
+			return E('div', { style: 'display:flex;flex-wrap:wrap;justify-content:center;' }, Object.entries(wirelessDevices).map(([name, tooltips]) => {
+				return E('span', { 'class': 'show-info', 'data-tooltip': tooltips.join('\n') }, name);
+			}));
 		};
 
 		option = section.option(form.MultiValue, 'device', _('Ethernet'));
