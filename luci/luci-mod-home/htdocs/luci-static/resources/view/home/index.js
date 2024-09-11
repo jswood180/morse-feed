@@ -306,6 +306,7 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) 
 	let element;
 	element = E('details', {
 		id,
+		'class': 'uplink-connect',
 		'open': isUp ? null : '', // Show by default if we're not connected.
 		'data-isup': isUp,
 		'data-wifinetworkname': wifiNetwork.getName(),
@@ -717,7 +718,7 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 		// - whether we're in the middle of DPP (though this is just a timeout now)
 		// - whether we've revealed the password
 		const id = `ap-connect-methods-${wifiNetwork.getDevice().getName()}`;
-		connectMethods = document.getElementById(id) || E('details', { id }, [
+		connectMethods = document.getElementById(id) || E('details', { id, class: 'ap-connect-methods' }, [
 			E('summary', _('Connect a new device')),
 			E('dl', [
 				E('dt', _('Credentials')),

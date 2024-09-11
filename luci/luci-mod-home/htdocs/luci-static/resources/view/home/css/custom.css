@@ -234,12 +234,30 @@ dl {
   
 dt {
 	font-weight: bold;
-	grid-column: 1;
 }
   
 dd {
 	margin: 0;
-	grid-column: 2;
+}
+
+@media screen and (width <= 520px) {
+	/* Force password 'input' box to fit by having single column grid */
+	.ap-connect-methods dl > dd > dl {
+		grid-template-columns: 1fr;
+
+		/* let things compress in mobile view, even if they don't want to */
+		dd {
+			min-width: 0;
+
+			input {
+				min-width: 0;
+			}
+		}
+	}
+
+	.uplink-connect dl {
+		grid-template-columns: 1fr;
+	}
 }
 
 .titleinfo {
