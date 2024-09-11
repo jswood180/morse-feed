@@ -509,10 +509,10 @@ return view.extend({
 		}
 
 		option = section.option(morseui.SSIDListScan, 'ssid', _('SSID/Mesh ID'));
-		if (this.hasQRCode) {
+		if (this.hasQRCode && isMorse) {
 			option.depends('dpp', '0');
+			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
 		}
-		option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
 		option.datatype = 'and(maxlength(32),minlength(2))';
 		option.write = function (sectionId, value) {
 			const mode = this.map.lookupOption('mode', sectionId)[0].formvalue(sectionId);
@@ -545,8 +545,10 @@ return view.extend({
 		// modes + any extras that are currently set. Where this falls down
 		// is if a scan turns up APs that require other modes.
 		option = section.option(form.ListValue, 'encryption', _('Encryption'));
-		option.depends({ dpp: '0' });
-		option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
+		if (this.hasQRCode && isMorse) {
+			option.depends({ dpp: '0' });
+			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
+		}
 		const encryptionOptions = Array.from(isMorse ? DEFAULT_HALOW_ENCRYPTION_OPTIONS : DEFAULT_ENCRYPTION_OPTIONS);
 		for (const wi of uci.sections('wireless', 'wifi-iface')) {
 			if (wi.device === deviceName && wi.encryption && !encryptionOptions.includes(wi.encryption)) {
@@ -563,8 +565,10 @@ return view.extend({
 		};
 
 		option = section.option(WifiSecurityValue, '_wpa_key', _('Key/Security'));
-		option.depends({ dpp: '0' });
-		option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
+		if (this.hasQRCode && isMorse) {
+			option.depends({ dpp: '0' });
+			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
+		}
 		option.datatype = 'wpakey';
 		option.rmempty = true;
 		option.password = true;
