@@ -218,9 +218,16 @@ static void message_process(char *const message) {
                     led_finished();
                     apply_cached_confs();
                     clear_cached_confs();
-                } else if (strstr(value, "failed")) {
-                    // We don't want to indicate DPP failed scenario and allow DPP to timeout
-                    printf("Avoid doing anything on DPP PB failure\n");
+                } else {
+                    // We don't want to indicate DPP failure scenarios and instead should allow DPP
+                    // to timeout (after 120 secs).
+                    // This is because:
+                    //  - DPP has a 110 secs timeout on an enrollee hash overlap, so
+                    //    failing fast just lets the user initiate a DPP that will probably fail
+                    //  - There are other statuses that can cause a failure other than
+                    //    TYPE_PB_RESULT=failed. e.g. DPP-AUTH-INIT-FAILED,
+                    //    or TYPE_PB_RESULT=session-overlap, or crashing...
+                    printf("No action on DPP_PB_RESULT=%s\n", value);
                 }
                 break;
             case TYPE_PB_STATUS:
