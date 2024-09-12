@@ -198,8 +198,18 @@ function getL2Devices(netIface) {
 		if (!ports) {
 			return [];
 		} else {
-			return ports.filter(p => !(p.getType() === 'wifi' && p.getName().includes('.')));
+			return ports.filter(p => !(
+				(p.getType() === 'wifi' && !p.getName())
+				|| (p.getType() === 'wifi' && p.getName().includes('.'))
+			));
 		}
+	} else if (device.getType() === 'wifi' && !device.getName()) {
+		// This happens if the uci config has changed but hasn't been applied.
+		// (e.g. if you remove a wifi-iface). This is tricky to resolve cleanly,
+		// because the upstream luci code wants to interact with both the current
+		// device state _and_ the updated uci (i.e. the approach is inherently
+		// flawed).
+		return [];
 	} else {
 		return [device];
 	}
@@ -420,7 +430,7 @@ async function updateUplinkWifiConnectMethods(hasQRCode, connectMethods, isUp) {
 	}
 }
 
-async function createUplinkCard(netIface, wifiNetworks, hasQRCode) {
+async function createUplinkCard(netIface, hasQRCode) {
 	const device = getBestDevice(netIface);
 	let wifiNetwork = device.getWifiNetwork();
 
@@ -1186,10 +1196,8 @@ return view.extend({
 		const localNetworks = [];
 		let uplink;
 		for (const netIface of networks) {
-			const device = netIface.getL2Device();
-			if (!device || (device.isBridge() && !device.getPorts())) {
-				// This device is never going to be anything useful; it's
-				// a bridge with nothing on it.
+			const devices = getL2Devices(netIface);
+			if (devices.length === 0) {
 				continue;
 			}
 
@@ -1206,7 +1214,7 @@ return view.extend({
 		}
 
 		if (uplink) {
-			cards.push(await createUplinkCard(uplink, wifiNetworks, hasQRCode));
+			cards.push(await createUplinkCard(uplink, hasQRCode));
 		}
 
 		// List non-HaLow APs later
