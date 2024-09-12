@@ -46,12 +46,11 @@ endef
 define Package/morse-regdb/config
 	config MORSE_REGDB_COUNTRY_CODE_FILTER
 		string "Two letter country codes to filter in, separated by |"
-		default "ALL"
 		depends on PACKAGE_morse-regdb
 		help
 			Filter the country codes in the regulatory database.
 			Enter a list of two letter country codes separated by |.
-			Enter "ALL" to include all country codes.
+			Leave blank to include all countries.
 			This only filters the channels.csv file, which affects the choices
 			available in the UI but does not otherwise limit the capabilities
 			of the device.
@@ -61,10 +60,11 @@ define Build/Prepare
 	$(if $(REGENERATE),$(call Build/Prepare/Default))
 endef
 
-ifeq ($(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER),ALL)
+FILTER_ARG := $(strip $(subst ",,$(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER)))
+ifeq ($(FILTER_ARG),)
 FILTER := cat
 else
-FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^('$(CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER)')$$$$/)'
+FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^($(FILTER_ARG))$$$$/)'
 endif
 
 define Build/Compile
