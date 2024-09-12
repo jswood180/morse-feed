@@ -305,8 +305,8 @@ return view.extend({
 			callGetBuiltinEthernetPorts(),
 			configDiagram.loadTemplate(),
 			uci.load(['network', 'wireless', 'firewall', 'dhcp', 'system']),
-			uci.load(['prplmesh']).catch(),
-			uci.load(['mesh11sd']).catch(),
+			uci.load(['prplmesh']).catch(e => e),
+			uci.load(['mesh11sd']).catch(e => e),
 		]);
 	},
 

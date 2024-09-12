@@ -95,7 +95,7 @@ class AbstractWPSButtonElement extends HTMLElement {
 				// We don't stop the spinner on success because we let
 				// the update query our current state.
 				// TODO: Show luci error...
-					this.stopWPS().catch();
+					this.stopWPS().catch(e => e);
 					this.update();
 				};
 				this.title = _('Waiting to connect - make sure you push the WPS button on the other device.');
