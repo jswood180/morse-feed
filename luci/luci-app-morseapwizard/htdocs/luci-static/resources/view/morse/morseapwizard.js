@@ -293,7 +293,7 @@ return view.extend({
 				const { wifiDevice } = wizard.readSectionInfo();
 
 				if (!wifiDevice) {
-					this.errorMessage = INVALID_CONFIG_MESSAGE.format(_('No 2.4 Wi-Fi radio found'));
+					this.errorMessage = INVALID_CONFIG_MESSAGE.format(_('No 2.4 GHz Wi-Fi radio found'));
 				}
 			} catch (e) {
 				this.errorMessage = INVALID_CONFIG_MESSAGE.format(e.message);
@@ -338,18 +338,20 @@ return view.extend({
 				E('em', { style: 'margin-left: 1rem; display: inline-block; width: 14rem; white-space: nowrap;' }, '← ' + info),
 			]));
 		};
-		makeOptionWithInfo('standard', _('Access Point'), _('fastest mode if <4km range'));
-		makeOptionWithInfo('mesh', _('802.11s Mesh Gate'), _('use extra devices for more range'));
-		makeOptionWithInfo('prplmesh', _('EasyMesh Controller/Agent'), _('use extra devices for more range'));
+		makeOptionWithInfo('standard', _('Access Point'), _('Fastest mode if <4km range.'));
+		makeOptionWithInfo('mesh', _('802.11s Mesh'), _('Use extra devices for more range.'));
+		makeOptionWithInfo('prplmesh', _('EasyMesh Controller'), _('Use extra devices for more range.'));
 		o.onchange = () => this.saveToUciCache();
 		o.default = 'standard';
 
 		o = s.option(form.ListValue, 'network_mode', _('Network Mode'));
 		o.widget = 'radio';
 		o.orientation = 'vertical';
-		o.value('bridged', _('Wi-Fi devices will get an IP on your existing router\'s network'));
-		o.value('routed_wan', _('Wi-Fi devices will get an IP on this device\'s local network'));
-		o.value('routed_wifi24', _('Wi-Fi devices will get an IP on this device\'s local network and you use 2.4 GHz Wi-Fi for an uplink (not an Ethernet cable)'));
+		o.value('bridged', _('HaLow Wi-Fi devices will get an IP on your existing router\'s network.'));
+		const routed_wan_string = _('HaLow Wi-Fi devices will get an IP on this device\'s local network.');
+		o.value('routed_wan', routed_wan_string);
+		const routed_wifi24_string = _('HaLow Wi-Fi devices will get an IP on this device\'s local network and use 2.4 GHz Wi-Fi for an uplink (not an Ethernet cable).');
+		o.value('routed_wifi24', routed_wifi24_string);
 		o.depends({ '!reverse': true, 'device_mode': 'prplmesh' });
 		o.onchange = () => this.saveToUciCache();
 		o.default = 'bridged';
@@ -359,8 +361,8 @@ return view.extend({
 		o = s.option(form.ListValue, 'network_mode_prplmesh', _('Network Mode'));
 		o.widget = 'radio';
 		o.orientation = 'vertical';
-		o.value('routed_wan', _('Wi-Fi devices will get an IP on this device\'s local network'));
-		o.value('routed_wifi24', _('Wi-Fi devices will get an IP on this device\'s local network and you use 2.4 GHz Wi-Fi for an uplink (not an Ethernet cable)'));
+		o.value('routed_wan', routed_wan_string);
+		o.value('routed_wifi24', routed_wifi24_string);
 		o.depends('device_mode', 'prplmesh');
 		o.onchange = () => this.saveToUciCache();
 		o.default = 'routed_wan';
