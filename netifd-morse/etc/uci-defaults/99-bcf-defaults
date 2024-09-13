@@ -14,7 +14,15 @@ fix_bcf_default() {
 	config_get type "$config" type
 	[ "morse" = "$type" ] || return 1
 
-	uci -q get wireless."${config}".bcf && return 0
+	if [ "$board_name" = "morse,artini" ]; then
+		current_bcf=$(uci -q get wireless."${config}".bcf)
+		if [ "$current_bcf" != "bcf_aw-hm593.bin" ]; then
+			return 0
+		fi
+	else
+		uci -q get wireless."${config}".bcf && return 0
+	fi
+
 	board=$(board_name)
 	case "$board" in
 		morse,ekh01-03 |\
@@ -31,7 +39,7 @@ fix_bcf_default() {
 			bcf=bcf_ekh04_v4.bin
 		;;
 		morse,artini)
-			bcf=bcf_aw-hm593.bin
+			bcf=bcf_mm_hl1.bin
 		;;
 	esac
 

@@ -129,7 +129,7 @@ EOF
 				bcf=bcf_ekh04_v4.bin
 			;;
 			morse,artini)
-				bcf=bcf_aw-hm593.bin
+				bcf=bcf_mm_hl1.bin
 			;;
 		esac
 
