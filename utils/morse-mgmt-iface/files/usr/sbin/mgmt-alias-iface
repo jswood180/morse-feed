@@ -1,0 +1,80 @@
+#!/bin/sh
+
+. /lib/functions.sh
+is_mgmt_iface_available=0
+DEFAULT_MGMT_IP="10.22.121.111"
+DEFAULT_MGMT_NETMASK="255.255.255.254"
+MGMT_IP_CIDR=31
+
+check_and_remove_alias_elsewhere() {
+	bridge=$1
+	route_info=$(ip route | grep "$DEFAULT_MGMT_IP")
+
+	if [[ -n "$route_info" ]]; then
+		dev=$(echo "$route_info" | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
+
+		if [[ "$dev" == "$bridge" ]]; then
+			is_mgmt_iface_available=1
+		else
+			ip addr del "$DEFAULT_MGMT_IP/$MGMT_IP_CIDR" dev "$dev"
+		fi
+	fi
+}
+
+get_port_device() {
+	local section=$1
+	local port=$2
+
+	local ports=$(config_get "$section" "ports")
+	if echo "$ports" | grep -qw "$port"; then
+		config_get bridge_name "$section" "name"
+	fi
+}
+
+get_bridge() {
+	local port=$1
+	config_load network
+	config_foreach get_port_device device $port
+	echo $bridge_name
+}
+
+# Function to handle alias creation
+add_alias() {
+	local port=$1
+	local bridge=$(get_bridge $port)
+	if [ -n "$bridge" ]; then
+		check_and_remove_alias_elsewhere $bridge
+		if [ $is_mgmt_iface_available == 0 ]; then
+			ip addr add $DEFAULT_MGMT_IP/$MGMT_IP_CIDR dev $bridge
+			nft add rule inet fw4 input ip daddr $DEFAULT_MGMT_IP counter accept
+			nft add rule inet fw4 output ip saddr $DEFAULT_MGMT_IP counter accept
+			fw4 reload
+		fi
+	fi
+}
+
+trap 'cleanup' EXIT
+
+trap exit SIGTERM
+
+cleanup() {
+	pid=$$
+	kill $(pgrep -P $pid)
+}
+
+exec 3< <(ubus subscribe network.device)
+
+while true; do
+	# Read a line from the ubus subscription
+	if read -r line <&3; then
+		link_up=$(echo "$line" | grep '"link_up"')
+		ifname=$(echo "$link_up" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')
+		if [ -n "$ifname" ]; then
+			case "$ifname" in
+				lan|usblan|eth0|eth0.1)
+				add_alias "$ifname"
+				;;
+			esac
+		fi
+	fi
+done
