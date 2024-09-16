@@ -12,15 +12,6 @@
 		morse_mode_short_display = modeinfo.morse_mode_short_display
 	end
 
-	local mode_link = ""
-	local mode_links = {"/cgi-bin/luci/admin/morseapwizard", "/cgi-bin/luci/admin/selectwizard"}
-	for _, link in ipairs(mode_links) do
-		if posix.stat(link, "type") ~= "file" then
-			mode_link = link
-			break
-		end
-	end
-
 	local node = disp.context.dispatched
 
 	-- send as HTML5
@@ -178,7 +169,7 @@
 							<div class="status" id="indicators"></div>
 							<div class="mode-status">
 								<span data-style="active">
-									<a href="<%= mode_link%>">
+									<a href="/cgi-bin/luci/admin/selectwizard">
 										<%=morse_mode_short_display%>
 									</a>
 								</span>
