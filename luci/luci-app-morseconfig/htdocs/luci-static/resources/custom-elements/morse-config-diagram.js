@@ -420,6 +420,7 @@ class MorseConfigDiagram extends HTMLElement {
 		slots['STA_WIFI24_DEVICE'] = _('Laptop/Device');
 		slots['AP_WIFI24_DEVICE'] = _('Laptop/Device');
 		slots['AP_UPLINK_WIFI24_LINK'] = _('2.4GHz WiFi');
+		slots['AP_WIFI24_LINK'] = _('2.4GHz WiFi');
 		slots['STA_WIFI24_LINK'] = _('2.4GHz WiFi');
 		slots['AP_SELECT_TEXT'] = _('This Device');
 		slots['STA_SELECT_TEXT'] = _('This Device');

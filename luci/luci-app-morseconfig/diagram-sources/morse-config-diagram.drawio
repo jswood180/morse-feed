@@ -1,6 +1,6 @@
-<mxfile host="Electron" modified="2024-07-22T05:39:44.044Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.21 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="6mcvZ3VzCQqUwbHI3b_t" version="22.1.21" type="device">
+<mxfile host="Electron" modified="2024-09-17T01:20:44.558Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.18 Chrome/120.0.6099.199 Electron/28.1.2 Safari/537.36" etag="kd3bPyZctIQ69DTXPf4H" version="22.1.18" type="device">
   <diagram name="Template" id="oneHeHX74wjatnCjrBri">
-    <mxGraphModel dx="2129" dy="1838" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1262" dy="2063" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="IulhXAhDTtXNDePGMQHC-0" />
         <mxCell id="IulhXAhDTtXNDePGMQHC-1" parent="IulhXAhDTtXNDePGMQHC-0" />
@@ -254,7 +254,7 @@
         </object>
         <object label="STA_WIFI24_DEVICE" group="STA_WIFI24" slot="STA_WIFI24_DEVICE" id="IulhXAhDTtXNDePGMQHC-9">
           <mxCell style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.laptop;" parent="IulhXAhDTtXNDePGMQHC-1" vertex="1">
-            <mxGeometry x="640" y="11.5" width="100" height="55" as="geometry" />
+            <mxGeometry x="630" y="10" width="100" height="55" as="geometry" />
           </mxCell>
         </object>
         <object label="" group="STA_WIFI24" id="IulhXAhDTtXNDePGMQHC-10">
@@ -282,7 +282,7 @@
         </object>
         <object label="&lt;div&gt;STA_WIFI24_LINK&lt;/div&gt;" group="STA_WIFI24" slot="STA_WIFI24_LINK" id="IulhXAhDTtXNDePGMQHC-17">
           <mxCell style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="IulhXAhDTtXNDePGMQHC-1" vertex="1" connectable="0">
-            <mxGeometry x="744.997207456327" y="159.00239457568415" as="geometry">
+            <mxGeometry x="744.997207456327" y="164.00239457568415" as="geometry">
               <mxPoint x="-89" y="-60" as="offset" />
             </mxGeometry>
           </mxCell>
@@ -290,10 +290,10 @@
         <object label="" group="AP_WIFI24" id="P93bP9fnSOs7cqkWcT01-0">
           <mxCell style="html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.comm_link_edge;html=1;rounded=0;sourcePerimeterSpacing=0;targetPerimeterSpacing=20;" parent="IulhXAhDTtXNDePGMQHC-1" edge="1">
             <mxGeometry width="100" height="100" relative="1" as="geometry">
-              <mxPoint x="334.4916201117319" y="185.5" as="sourcePoint" />
-              <mxPoint x="380" y="100" as="targetPoint" />
+              <mxPoint x="334.4916201117319" y="182.5" as="sourcePoint" />
+              <mxPoint x="380" y="87" as="targetPoint" />
               <Array as="points">
-                <mxPoint x="100" y="92.5" />
+                <mxPoint x="100" y="89.5" />
               </Array>
             </mxGeometry>
           </mxCell>
@@ -305,14 +305,14 @@
         </object>
         <object label="&lt;div&gt;AP_WIFI24_LINK&lt;/div&gt;" group="AP_WIFI24" slot="AP_WIFI24_LINK" id="P93bP9fnSOs7cqkWcT01-2">
           <mxCell style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="IulhXAhDTtXNDePGMQHC-1" vertex="1" connectable="0">
-            <mxGeometry x="448.99720745632703" y="179.00239457568415" as="geometry">
+            <mxGeometry x="456.99720745632703" y="168.00239457568415" as="geometry">
               <mxPoint x="-89" y="-60" as="offset" />
             </mxGeometry>
           </mxCell>
         </object>
         <object label="AP_WIFI24_DEVICE" group="AP_WIFI24" slot="AP_WIFI24_DEVICE" id="P93bP9fnSOs7cqkWcT01-3">
           <mxCell style="fontColor=#0066CC;verticalAlign=top;verticalLabelPosition=bottom;labelPosition=center;align=center;html=1;outlineConnect=0;fillColor=#CCCCCC;strokeColor=#6881B3;gradientColor=none;gradientDirection=north;strokeWidth=2;shape=mxgraph.networks.laptop;" parent="IulhXAhDTtXNDePGMQHC-1" vertex="1">
-            <mxGeometry x="314" y="16.5" width="100" height="55" as="geometry" />
+            <mxGeometry x="314" y="10" width="100" height="55" as="geometry" />
           </mxCell>
         </object>
         <object label="&lt;p&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;AP_WIFI24_XIP&lt;/font&gt;&lt;/p&gt;" group="AP_WIFI24" slot="AP_WIFI24_XIP" id="P93bP9fnSOs7cqkWcT01-4">
