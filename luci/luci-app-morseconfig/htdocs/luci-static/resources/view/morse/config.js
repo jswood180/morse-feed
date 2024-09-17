@@ -212,6 +212,17 @@ const WifiSecurityValue = form.Value.extend({
 			}, _('Configure...'));
 		}
 	},
+
+	validate(sectionId, value) {
+		const encryption = this.section.formvalue(sectionId, 'encryption');
+		if (ENCRYPTION_MODES_USING_KEYS.has(encryption)) {
+			if (!value || value === '') {
+				return _('Encryption "%s" requires a key').format(encryption);
+			}
+		}
+
+		return true;
+	},
 });
 
 // In the quick config page, we only really want to deal with 'normal' looking ifaces
