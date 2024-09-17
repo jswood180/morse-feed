@@ -138,7 +138,7 @@ return view.extend({
 		uci.set('wireless', morseInterfaceName, 'wds', '1');
 
 		morseuci.ensureNetworkExists('lan');
-		morseuci.setupNetworkWithDnsmasq('lan', uci.get('network', 'lan', 'ip') || DEFAULT_LAN_IP);
+		morseuci.setupNetworkWithDnsmasq('lan', uci.get('network', 'lan', 'ipaddr') || DEFAULT_LAN_IP);
 
 		switch (this.data.wizard.device_mode) {
 			case 'standard':
