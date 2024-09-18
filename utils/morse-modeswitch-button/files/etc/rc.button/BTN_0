@@ -1,0 +1,43 @@
+#!/bin/sh
+# This is based on the openwrt rc.button/reset script
+
+. /etc/diag.sh
+
+case "$ACTION" in
+pressed)
+	return 5  # trigger a timeout after 5 seconds
+;;
+timeout)
+	if [ "$SEEN" -ge 10 ]
+	then
+		set_state sta_change
+		return 0
+	elif [ "$SEEN" -ge 5 ]
+	then
+		set_state ap_change
+		# After the initial timeout (which starts the ap flashing change),
+		# we return another timeout value so we can do the sta flashing.
+		return 5
+	fi
+;;
+released)
+	if [ "$SEEN" -lt 1 ]
+	then
+		/morse/scripts/dpp_start.sh
+	elif [ "$SEEN" -ge 10 ]
+	then
+		logger -t button -p daemon.notice "setting mode to STA"
+		persistent_vars_storage.sh WRITE mm_mode sta
+		set_state factory_reset
+		jffs2reset -y && reboot &
+	elif [ "$SEEN" -ge 5 ]
+	then
+		logger -t button -p daemon.notice "setting mode to AP"
+		persistent_vars_storage.sh WRITE mm_mode ap
+		set_state factory_reset
+		jffs2reset -y && reboot &
+	fi
+;;
+esac
+
+return 0
