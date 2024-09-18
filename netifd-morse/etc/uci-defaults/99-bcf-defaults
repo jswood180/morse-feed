@@ -30,6 +30,9 @@ fix_bcf_default() {
 		morse,ekh04v4)
 			bcf=bcf_ekh04_v4.bin
 		;;
+		morse,artini)
+			bcf=bcf_aw-hm593.bin
+		;;
 	esac
 
 	[ -z "$bcf" ] && return 0
