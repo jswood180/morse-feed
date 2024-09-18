@@ -39,6 +39,34 @@ show_raw_partition_data()
 	echo "$(dd if="$(find_mtd_partition "$partition")" bs=1  skip=$(($skip)) count="$count" 2> /dev/null)"
 }
 
+show_factory_data()
+{
+	local mm_region
+
+	case "$(cat /tmp/sysinfo/board_name)" in
+		morse,artini)
+			case "$1" in
+				device_password)
+					show_raw_partition_data factory 0x40a0 32
+				;;
+				default_wifi_key)
+					show_raw_partition_data factory 0x4080 32
+				;;
+				mm_region)
+					mm_region="$(show_raw_partition_data factory 0x40c0 2)"
+					# APP-2988 - for Artini, use AU region as default so EVT devices come up
+					# on first boot (no factory partition is written).
+					if [ -n "$mm_region" ]; then
+						echo "$mm_region"
+					else
+						echo AU
+					fi
+				;;
+			esac
+		;;
+	esac
+}
+
 # Use secondary uboot env in preference
 # (this one is less likely to be the 'real' uboot env).
 # The disadvantage of using the real uboot env is that if it's empty/fails the CRC
@@ -56,7 +84,11 @@ key="$2"
 
 case "$operation" in
 	READ)
-		fw_printenv -n -c "$conffile" "$key" 2> /dev/null
+		if ! fw_printenv -n -c "$conffile" "$key" 2> /dev/null; then
+			# If the user asks for env data that's not available, fall back to factory
+			# defaults for the device (if available).
+			show_factory_data "$2"
+		fi
 	;;
 
 	WRITE)
