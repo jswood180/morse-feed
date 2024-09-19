@@ -103,7 +103,7 @@ case "$1" in
     finished)
         finished
         # Remove the DPP start timestamp file upon timeout or successful DPP completion.
-        rm $dpp_start_time
+        rm -f "$dpp_start_time"
     ;;
     started)
         started

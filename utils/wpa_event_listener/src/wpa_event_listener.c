@@ -236,6 +236,7 @@ static void message_process(char *const message) {
                 }
                 break;
             case TYPE_CTRL_EVENT_TERMINATING:
+                led_finished();
                 printf("Connection to wpa_supplicant lost - exiting\n");
                 uloop_end();
                 break;

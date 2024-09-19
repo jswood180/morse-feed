@@ -15,8 +15,7 @@ dpp_start_time=/tmp/dpp_start_time
 start_wpa_event_listener() {
 	# Start the wpa_event_listener to listen for DPP events. The
 	# wpa_event_listener will write the config on the STA side and control the
-	# blinking led. On the STA side of DPP QR code, wpa_event_listener is
-	# started by netifd.
+	# blinking led.
 	killall wpa_event_listener
 	wpa_event_listener "$@" -a /lib/netifd/morse/wpa_s1g_dpp_action.sh -B
 }
