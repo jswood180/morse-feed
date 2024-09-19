@@ -826,12 +826,17 @@ return view.extend({
 			}
 		};
 
+		const staticProtocol = network.getProtocol('static');
+
 		option = section.option(form.Value, 'ipaddr', 'IPv4 address');
 		option.depends('proto', 'static');
 		option.datatype = 'ip4addr("nomask")';
 		option.rmempty = false;
 		option.retain = true;
 		option.validate = function (sectionId, value) {
+			// Prevent users setting different networks to the same IP.
+			// This is valid, but too confusing.
+
 			const wifiNetworks = uci.sections('wireless', 'wifi-iface').filter(wi => wi.disabled !== '1').map(wi => wi.network);
 			// Only check if something is actually using our network.
 			if (morseuci.getNetworkDevices(sectionId).length > 0 || wifiNetworks.includes(sectionId)) {
@@ -851,7 +856,7 @@ return view.extend({
 				}
 			}
 
-			return Object.getPrototypeOf(this).validate.call(this, sectionId, value);
+			return staticProtocol.CBIIPValue.prototype.validate.call(this, sectionId, value);
 		};
 
 		option = section.option(form.Value, 'netmask', _('Netmask'));
@@ -864,22 +869,19 @@ return view.extend({
 		// and because of this LuCI decides to remove it unless retain is set.
 		// IMO this is a bug in LuCI, but for now we work around it.
 		option.retain = true;
+		option.validate = staticProtocol.CBINetmaskValue.prototype.validate;
 
-		option = section.option(form.Value, 'gateway', _('Gateway'));
+		option = section.option(staticProtocol.CBIGatewayValue, 'gateway', _('Gateway'));
 		option.description = GATEWAY_DESCRIPTION;
-		option.datatype = 'ip4addr("nomask")';
 		option.depends('proto', 'static');
-		option.validate = function (sectionId, value) {
-			if (value !== '' && this.section.formvalue(sectionId, 'ipaddr') === value) {
-				return _('The gateway address must not be the local IP address (usually you can leave this unset).');
-			}
-
-			return true;
-		};
 		// This is marked as inactive on the main page because it's hidden by max_cols,
 		// and because of this LuCI decides to remove it unless retain is set.
 		// IMO this is a bug in LuCI, but for now we work around it.
 		option.retain = true;
+
+		// This helps the validate functions on ip/netmask check properly against
+		// the current broadcast ip.
+		option = section.option(form.HiddenValue, 'broadcast');
 	},
 
 	/**
