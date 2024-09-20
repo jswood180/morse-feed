@@ -123,7 +123,6 @@ return wizard.AbstractWizardView.extend({
 			uci.set('wireless', morseInterfaceName, 'disabled', '0');
 			uci.set('wireless', morseInterfaceName, 'ifname', 'wlan-prpl');
 
-			uci.set('wireless', morseBackhaulStaName, 'device', morseDeviceName);
 			uci.set('wireless', morseBackhaulStaName, 'mode', 'sta');
 			uci.set('wireless', morseBackhaulStaName, 'multi_ap', '1');
 			uci.set('wireless', morseBackhaulStaName, 'wds', '1');
@@ -281,6 +280,7 @@ return wizard.AbstractWizardView.extend({
 		if (!uci.get('wireless', morseBackhaulStaName)) {
 			uci.add('wireless', 'wifi-iface', morseBackhaulStaName);
 		}
+		uci.set('wireless', morseBackhaulStaName, 'device', morseDeviceName);
 
 		// Enable prplmesh
 		uci.set('prplmesh', 'config', 'enable', '1');
