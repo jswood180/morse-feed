@@ -1,80 +1,201 @@
-#!/bin/sh
+#!/usr/bin/ucode -RS
+import { popen, readlink, basename } from "fs";
+import { cursor } from "uci";
+import { connect } from "ubus";
 
-. /lib/functions.sh
-is_mgmt_iface_available=0
-DEFAULT_MGMT_IP="10.22.121.111"
-DEFAULT_MGMT_NETMASK="255.255.255.254"
-MGMT_IP_CIDR=31
+const uloop = require("uloop");
+const ubus = connect();
+const dest_network = "10.22.121.110/31";
+const mgmt_cidr = "31";
+const mgmt_ip = "10.22.121.111";
 
-check_and_remove_alias_elsewhere() {
-	bridge=$1
-	route_info=$(ip route | grep "$DEFAULT_MGMT_IP")
+// This is an ordered list of interfaces available on the board.
+// Changing the order alters the priority, with index 0 representing
+// the highest-priority interface.
+const board_if_list = [ "lan", "usblan", "eth0.1", "eth0" ];
 
-	if [[ -n "$route_info" ]]; then
-		dev=$(echo "$route_info" | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
-
-		if [[ "$dev" == "$bridge" ]]; then
-			is_mgmt_iface_available=1
-		else
-			ip addr del "$DEFAULT_MGMT_IP/$MGMT_IP_CIDR" dev "$dev"
-		fi
-	fi
+function exec_cmd(cmd) {
+	const proc = popen(cmd);
+	if (proc) {
+		const output = proc.read("all");
+		// If output is null, it indicates a read error
+		if (!output) {
+			warn(`mgmt-alias-iface: ${proc.error()}: Error reading the output of command: ${cmd}\n`);
+			proc.close();
+			return false;
+		}
+		const ret = proc.close();
+		//When the program terminated normally, it returns the positive exit code of the program. 
+		if ( !ret ) {
+			warn(`mgmt-alias-iface: ${proc.error()}: Error terminating command: ${cmd}\n`);
+			return false;
+		} else if (ret == 0) {
+			return output;
+		} else {
+			warn(`mgmt-alias-iface: ${proc.error()}: Error terminating command ${cmd} with output ${output}\n`);
+			return false;
+		}
+	} else {
+		warn(`mgmt-alias-iface: Error executing command: ${cmd}\n`);
+		return false;
+	}
 }
 
-get_port_device() {
-	local section=$1
-	local port=$2
-
-	local ports=$(config_get "$section" "ports")
-	if echo "$ports" | grep -qw "$port"; then
-		config_get bridge_name "$section" "name"
-	fi
+function get_alias_bridge() {
+	let alias_bridge = null;
+	let ip_route = exec_cmd("ip route");
+	if(ip_route) {
+		let match_result = match(ip_route, regexp(`${dest_network} dev\\s+(\\S+)`, 'gs'));
+		if (match_result != null) {
+			alias_bridge = match_result[0][1];
+		}
+	}
+	return alias_bridge;
 }
 
-get_bridge() {
-	local port=$1
-	config_load network
-	config_foreach get_port_device device $port
-	echo $bridge_name
+function alias_exists(bridge) {
+	let existing_bridge = get_alias_bridge();
+	if(existing_bridge && existing_bridge  === bridge)
+		return true;
+
+	return false;
 }
 
-# Function to handle alias creation
-add_alias() {
-	local port=$1
-	local bridge=$(get_bridge $port)
-	if [ -n "$bridge" ]; then
-		check_and_remove_alias_elsewhere $bridge
-		if [ $is_mgmt_iface_available == 0 ]; then
-			ip addr add $DEFAULT_MGMT_IP/$MGMT_IP_CIDR dev $bridge
-			nft add rule inet fw4 input ip daddr $DEFAULT_MGMT_IP counter accept
-			nft add rule inet fw4 output ip saddr $DEFAULT_MGMT_IP counter accept
-			fw4 reload
-		fi
-	fi
+function set_up_alias_network(bridge) {
+	// Check and remove alias if present elsewhere other than the given bridge
+	let existing_bridge = get_alias_bridge();
+
+	if (existing_bridge && bridge && existing_bridge !== bridge) {
+		if (!exec_cmd(`ip addr del ${mgmt_ip}/${mgmt_cidr} dev ${existing_bridge}`)) {
+			warn(`Error: Failed to remove alias from ${existing_bridge}\n`);
+		}
+	}
+
+	// Add alias to the given bridge
+	if (!exec_cmd(`ip addr add ${mgmt_ip}/${mgmt_cidr} dev ${bridge}`)) {
+		warn(`mgmt-alias-iface: Error: Failed to add alias to ${bridge}\n`);
+		return false;
+	}
+
+	// Add firewall rules for the management IP
+	if (!exec_cmd(`nft add rule inet fw4 input ip daddr ${mgmt_ip} counter accept`)) {
+		warn(`mgmt-alias-iface: Error: Failed to add firewall rule for input on ${mgmt_ip}\n`);
+		return false;
+	}
+
+	if (!exec_cmd(`nft add rule inet fw4 output ip saddr ${mgmt_ip} counter accept`)) {
+		warn(`mgmt-alias-iface: Error: Failed to add firewall rule for output on ${mgmt_ip}\n`);
+		return false;
+	}
+
+	// Reload firewall configuration
+	if (!exec_cmd(`fw4 reload`)) {
+		warn("mgmt-alias-iface: Error: Failed to reload firewall configuration\n");
+		return false;
+	}
+
+	return true;
 }
 
-trap 'cleanup' EXIT
+function firewall_zone_permitted(iface, bridge) {
+	let accept_network = [];
+	let uci = cursor();
+	uci.foreach("firewall", "zone", section => {
+		if (section["input"] === "ACCEPT"){
+			let arr= section["network"];
+			if(type(arr) == "array")
+				push(accept_network,...arr);
+			else
+				push(accept_network,arr);
+	}});
 
-trap exit SIGTERM
+	/* We check if the bridge, where the alias will be added, is part of a network
+	* with a permissible INPUT firewall rule. Since we only need to add the
+	* management IP to physical ports, which must be part of a bridge device,
+	* it is sufficient to always check the bridge device in this scenario.
+	*/
+	for(let network_iface in accept_network) {
+		let device = uci.get("network", network_iface, "device");
+		if(device && device === bridge) {
+			return true;
+		}
+	}
 
-cleanup() {
-	pid=$$
-	kill $(pgrep -P $pid)
+	return false;
 }
 
-exec 3< <(ubus subscribe network.device)
+/* 'set_alias_on_active_link' optionally takes an interface list as an argument.
+*  If not provided, it defaults to the board's interface list. It parses the
+*  list, ordered by interface priority, and assigns a Management Alias IP to
+*  the bridge device of the highest-priority interface with an active link,
+*  that is part of a network and within a permissible firewall zone.
+*/
 
-while true; do
-	# Read a line from the ubus subscription
-	if read -r line <&3; then
-		link_up=$(echo "$line" | grep '"link_up"')
-		ifname=$(echo "$link_up" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')
-		if [ -n "$ifname" ]; then
-			case "$ifname" in
-				lan|usblan|eth0|eth0.1)
-				add_alias "$ifname"
-				;;
-			esac
-		fi
-	fi
-done
+function set_alias_on_active_link(...args) {
+	let if_list = [];
+	if(length(args) === 0) {
+			if_list = board_if_list;
+
+	} else {
+			if_list = args[0];
+	}
+
+	for (let iface in if_list) {
+		let result = ubus.call("network.device", "status", {name: iface});
+		if (result && result.carrier) {
+			const bridge = basename(readlink(`/sys/class/net/${iface}/master`));
+			if(firewall_zone_permitted(iface, bridge)) {
+				if (!alias_exists(bridge)) {
+					if(set_up_alias_network(bridge)) {
+						break;
+					}
+					else {
+						warn(`mgmt-alias-iface: Could not set up management alias network on ${bridge} for ${iface} \n`);
+					}
+				} else {
+					break;
+				}
+			}
+		} else if (!result) {
+			warn("mgmt-alias-iface: UBUS call network.device error: " + ubus.error() + "\n");
+		}
+	}
+}
+
+function process_notification(data) {
+	let ifname = data.name;
+	if (index(board_if_list, ifname) != -1) {
+		if (data.link_active == true) {
+			set_alias_on_active_link();
+		} else if (data.link_active == false) {
+			let if_list = filter(board_if_list, iface => iface != ifname);
+			// Assign alias to eligible remaining interfaces
+			set_alias_on_active_link(if_list);
+		}
+	}
+}
+
+function main() {
+	uloop.init();
+	let sub = ubus.subscriber(
+		// Ubus subscriber notify callback
+		function(notify) {
+			process_notification(json(sprintf("%s",notify.data)));
+		},
+		// Ubus subscriber remove callback
+		function(id) {
+			uloop.end();
+		}
+	);
+	if (!sub.subscribe("network.device")) {
+		warn("mgmt-alias-iface: UBUS subscribe error: " + ubus.error() + "\n");
+	}
+
+	/* Check all available board interfaces initially to find an eligible one
+	* for setting the Management IP. This ensures that any events missed
+	* during the process restart are handled.
+	*/
+	set_alias_on_active_link();
+	uloop.run();
+}
+main();

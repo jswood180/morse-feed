@@ -14,7 +14,7 @@ define Package/morse-mgmt-iface
 	CATEGORY:=Base system
 	TITLE:=Morse Micro Management alias Network interface
 	MAINTAINER:=Morse Micro
-	DEPENDS:=+netifd-morse
+	DEPENDS:=+netifd-morse +ucode +ucode-mod-fs +ucode-mod-ubus +ucode-mod-uci +ucode-mod-uloop
 endef
 
 define Package/morse-mgmt-iface/description
