@@ -54,6 +54,16 @@ define Package/morse-regdb/config
 			This only filters the channels.csv file, which affects the choices
 			available in the UI but does not otherwise limit the capabilities
 			of the device.
+	config MORSE_REGDB_CHANNEL_NEGATIVE_FILTER
+		string "Channel number to filter out, separated by |"
+		depends on PACKAGE_morse-regdb
+		help
+			Filter out channels from regulatory database.
+			Enter a list channels separated by |.
+			Leave blank to include all channels.
+			This only filters the channels.csv file, which affects the choices
+			available in the UI but does not otherwise limit the capabilities
+			of the device.
 endef
 
 define Build/Prepare
@@ -65,6 +75,13 @@ ifeq ($(FILTER_ARG),)
 FILTER := cat
 else
 FILTER := awk -F, 'NR==1 || ($$$$1 ~ /^($(FILTER_ARG))$$$$/)'
+endif
+
+FILTER_ARG := $(strip $(subst ",,$(CONFIG_MORSE_REGDB_CHANNEL_NEGATIVE_FILTER)))
+ifeq ($(FILTER_ARG),)
+FILTER += | cat
+else
+FILTER += | awk -F, 'NR==1 || !($$$$3 ~ /^($(FILTER_ARG))$$$$/)'
 endif
 
 define Build/Compile
