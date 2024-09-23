@@ -388,6 +388,24 @@ drv_morse_setup() {
 		# Now remove wlan?, since any wlan* interfaces we want will be
 		# created by the wifi-iface sections in the uci config.
 		iw dev "$auto_ifname" del
+		# If we didn't come up as wlan0, wait around for a bit and
+		# hope that whoever has wlan0 gives it up. Since OpenWrt's
+		# default naming is phy-role (e.g. phy0-ap0), the usual way
+		# this happens is another wifi module getting wlan0 on insertion.
+		# Note that this is not guaranteed to work in all situations!
+		if [ "$auto_ifname" != wlan0 ]; then
+			echo 'Waiting to see if wlan0 becomes available'
+			retries=4
+			while [ -e "/sys/class/net/wlan0" ]; do
+				if [ "$retries" -le 0 ]; then
+					echo "wlan0 still used after waiting"
+					break
+				fi
+
+				sleep 0.5
+				retries="$((retries - 1))"
+			done
+		fi
 	fi
 
 	json_add_object data
