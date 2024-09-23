@@ -152,7 +152,7 @@ const SimpleForwardSelect = form.ListValue.extend({
 		// in multiple renders for different networks).
 		delete choices[section_id];
 		for (const [k, v] of Object.entries(choices)) {
-			choices[k] = E('span', { class: 'zonebadge network-name', style: firewall.getZoneColorStyle(morseuci.getZoneForNetwork(v)) }, v);
+			choices[k] = E('span', { class: 'zonebadge network-name', style: firewall.getZoneColorStyle(morseuci.getZoneForNetwork(k)) }, v);
 		}
 
 		const widget = new ui.Dropdown(cfgvalue, choices, {
@@ -167,7 +167,35 @@ const SimpleForwardSelect = form.ListValue.extend({
 			validate: L.bind(this.validate, this, section_id),
 		});
 
-		return E('span', ['⇒ ', widget.render()]);
+		const dropdown = E('span', ['⇒ ', widget.render()]);
+
+		if (morseuci.getZoneForNetwork(section_id)) {
+			return dropdown;
+		} else {
+			dropdown.style.display = 'none';
+			// Hide the dropdown with a button if the zone doesn't exist.
+			// This means:
+			//  - if the user has no zone, they explicitly opt in to an ACCEPT zone
+			//  - if the user has created an interface via LuCI they can then
+			//    easily make that interface functional without having to understand
+			//    how to attach it to a firewall zone.
+			const ZONE_TOOLTIP = _(`
+				This interface has no firewall zone, which probably means it won't accept any traffic.
+				Click this button to create a default zone with everything set to ACCEPT. You will
+				then be able to set forwarding rules (if desired).
+			`).replace(/[\t\n ]+/g, ' ');
+			return E('span', [
+				E('span', [
+					E('span', { 'class': 'show-info', 'data-tooltip': ZONE_TOOLTIP }, ''),
+					E('button', { click: (e) => {
+						morseuci.getOrCreateZone(section_id);
+						e.target.parentElement.style.display = 'none';
+						e.target.parentElement.nextElementSibling.style.display = 'block';
+					} }, 'Create Zone'),
+				]),
+				dropdown,
+			]);
+		}
 	},
 });
 
