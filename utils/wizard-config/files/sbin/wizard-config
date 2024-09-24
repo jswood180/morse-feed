@@ -409,7 +409,10 @@ function fetch_config(url) {
 
 function find_service_url(ubus, dhcp_server_ipv4) {
 	const services = find_services(ubus, SERVICE);
-	assert(services && length(services) > 0, `Unable to find a '${SERVICE}' service; doing nothing\n`);
+	if (!services || length(services) === 0) {
+		print(`Unable to find a '${SERVICE}' service; doing nothing\n`);
+		exit(1);
+	}
 
 	const url = get_url_from_service(get_best_service(services, dhcp_server_ipv4));
 	assert(url, `Unable to construct valid wizard config URL from service: ${services}\n`);
