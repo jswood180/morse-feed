@@ -275,6 +275,26 @@ return view.extend({
 
 		// (3) Update diagram now we've flushed our config.
 		this.diagram.updateFrom(uci, this.ethernetPorts);
+
+		// (4) Update extra infobox.
+		this.updateInfoBox();
+	},
+
+	updateInfoBox() {
+		// At the moment, this is the only infobox thing we show.
+		const WIFI24_UPLINK_INFO = _(`
+			After saving a 2.4 GHz Wi-Fi uplink configuration, you will need to connect to the correct
+			network on on the Home page. Find the Uplink card, click on the "Disconnected" cross, then
+			set the SSID and password.
+		`);
+
+		const shouldShowWifi24UplinkInfo = () => (
+			(this.data.wizard.device_mode !== 'prplmesh' && this.data.wizard.network_mode === 'routed_wifi24')
+			|| (this.data.wizard.device_mode === 'prplmesh' && this.data.wizard.network_mode_prplmesh === 'routed_wifi24')
+		);
+
+		this.infobox.innerHTML = WIFI24_UPLINK_INFO;
+		this.infobox.style.display = shouldShowWifi24UplinkInfo() ? 'block' : 'none';
 	},
 
 	async load() {
@@ -319,7 +339,6 @@ return view.extend({
 
 		this.bridgeMAC = morseuci.getFakeMorseMAC(networkDevices) ?? morseuci.getRandomMAC();
 		this.ethernetPorts = ethernetPorts;
-		this.diagram = E('morse-config-diagram');
 		this.data = {
 			wizard: {
 				device_mode: this.getDeviceMode(),
@@ -327,6 +346,12 @@ return view.extend({
 				network_mode_prplmesh: this.getNetworkMode(),
 			},
 		};
+
+		this.diagram = E('morse-config-diagram');
+		this.diagram.updateFrom(uci, ethernetPorts);
+		this.infobox = E('div', { class: 'alert-message notice' });
+		this.updateInfoBox();
+
 		this.map = new form.JSONMap(this.data);
 		const s = this.map.section(form.NamedSection, 'wizard');
 		let o = s.option(form.ListValue, 'device_mode', _('HaLow Mode'));
@@ -367,12 +392,11 @@ return view.extend({
 		o.onchange = () => this.saveToUciCache();
 		o.default = 'routed_wan';
 
-		this.diagram.updateFrom(uci, this.ethernetPorts);
-
 		return await Promise.all([
 			E('h2', _('Wizard')),
 			E('div', { class: 'cbi-section' }, this.diagram),
 			this.map.render(),
+			this.infobox,
 		]);
 	},
 
