@@ -829,6 +829,120 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 	});
 }
 
+function createMesh11sCard(wifiNetwork, hostHints) {
+	const netIface = wifiNetwork.getNetwork();
+	const bitrate = wifiNetwork.getBitRate();
+	const wifiName = getWifiName(wifiNetwork);
+
+	const associatedDevices = wifiNetwork.assoclist.map(d => ({
+		mac: d.mac,
+		hostname: hostHints.getHostnameByMACAddr(d.mac),
+		ip: hostHints.getIPAddrByMACAddr(d.mac),
+		ip6: hostHints.getIP6AddrByMACAddr(d.mac),
+		connected_time: Math.round(d.connected_time / 60),
+		noise: d.noise,
+		signal: d.signal,
+	}));
+	const hasHostname = associatedDevices.some(d => d.hostname);
+	const hasIp = associatedDevices.some(d => d.ip);
+	const hasIp6 = associatedDevices.some(d => d.ip6);
+	const authentication = wifiNetwork.ubus('net', 'iwinfo', 'encryption').authentication || [];
+	const wifiPassword = (authentication.includes('sae') || authentication.includes('psk')) && wifiNetwork.get('key');
+
+	let connectMethods;
+	if (wifiPassword) {
+		// This bit of trickery is to avoid the refresh on the add-device-info,
+		// since we have three bits of state to persist:
+		// - whether we've expanded the section
+		// - whether we're in the middle of DPP (though this is just a timeout now)
+		// - whether we've revealed the password
+		const id = `mesh-connect-methods-${wifiNetwork.getDevice().getName()}`;
+		connectMethods = document.getElementById(id) || E('details', { id, class: 'mesh-connect-methods' }, [
+			E('summary', _('Connect a new device')),
+			E('dl', [
+				E('dt', _('Credentials')),
+				E('dd', {}, E('dl', [
+					E('dt', _('Mesh ID')),
+					E('dd', wifiNetwork.getMeshID()),
+					E('dt', _('Key/Password')),
+					E('dd', { class: 'control-group' }, [
+						E('input', {
+							type: 'password',
+							value: wifiPassword,
+							class: 'cbi-input-password',
+							readonly: true,
+						}),
+						E('button', {
+							class: 'cbi-button cbi-button-neutral',
+							tabindex: '-1"',
+							click: (e) => {
+								const passwordInput = e.target.previousElementSibling;
+								if (passwordInput.type === 'password') {
+									passwordInput.type = 'text';
+								} else {
+									passwordInput.type = 'password';
+								}
+							},
+						}, '*'),
+					]),
+				].filter(e => e))),
+			].filter(e => e)),
+		]);
+	}
+
+	let table;
+	if (associatedDevices.length > 0) {
+		table = E('table', { class: 'table cbi-section-table' }, th([
+			_('MAC Address'), hasHostname && _('Hostname'), hasIp && _('IPv4'), hasIp6 && _('IPv6'),
+			_('Time connected'), _('Noise'), _('Signal'),
+		].filter(t => t)));
+
+		cbi_update_table(table, associatedDevices.map(d => [
+			d.mac, d.hostname ?? (hasHostname && ' '), d.ip ?? (hasIp && ' '), d.ip6 ?? (hasIp6 && ' '),
+			d.connected_time + _(' min(s)'), d.noise + _(' dBm'), d.signal + _(' dBm'),
+		].filter(t => t)));
+	} else {
+		table = E('em', _('No active devices'));
+	}
+
+	return new Card(`wifi-mesh11s-${wifiName}`, {
+		heading: _('11s Mesh') + ` (${wifiName})`,
+		link: { href: L.url('admin', 'network', 'wireless'), title: _('Wireless Configuration') },
+		highlights: [wifiNetwork.getDevice(), netIface],
+		contents: [
+			E('dl', [
+				E('dt', _('Mesh ID')),
+				E('dd', wifiNetwork.getMeshID()),
+				E('dt', _('Device')),
+				E('dd', wifiNetwork.getDevice().getName()),
+				bitrate && E('dt', _('Speed (avg)')),
+				bitrate && E('dd', `${wifiNetwork.getBitRate()} Mbps`),
+			].filter(e => e)),
+			E('div', { class: 'main-counter' }, [
+				E('button', { class: 'big-number click-to-expand' }, wifiNetwork.assoclist.length),
+				E('button', { class: 'big-text click-to-expand' }, _('Connected Devices')),
+			]),
+		],
+		maxContents: [
+			E('dl', [
+				E('dt', _('SSID')),
+				E('dd', wifiNetwork.getSSID()),
+				E('dt', _('Device')),
+				E('dd', wifiNetwork.getDevice().getName()),
+				E('dt', _('IPv4')),
+				E('dd', netIface.getIPAddr() ?? _('None')),
+				E('dt', _('IPv6')),
+				E('dd', netIface.getIP6Addr() ?? _('None')),
+				E('dt', _('Encryption')),
+				E('dd', wifiNetwork.getActiveEncryption()),
+			].filter(e => e)),
+			E('h2', { style: 'margin: 0' }, _('Associated devices')),
+			connectMethods,
+			table,
+		].filter(e => e),
+	});
+}
+
 function renderPrplmeshTopology(agentOperational, prplmeshData) {
 	const graph = prplmeshData.buildGraph();
 
@@ -1171,17 +1285,26 @@ return view.extend({
 			})));
 
 		const cards = [];
-		const nonHaLowAPCards = [];
+		const nonHaLowCards = [];
 
 		// List HaLow APs first
 		// TODO: mesh cards (APP-3001)
 		for (const wifiNetwork of wifiNetworks) {
-			if (!wifiNetwork.isDisabled() && wifiNetwork.isUp() && wifiNetwork.getMode() === 'ap' && wifiNetwork.getNetwork()) {
-				const apCard = createAccessPointCard(wifiNetwork, hostHints);
-				if (isHaLow(wifiNetwork)) {
-					cards.push(apCard);
-				} else {
-					nonHaLowAPCards.push(apCard);
+			if (!wifiNetwork.isDisabled() && wifiNetwork.isUp() && wifiNetwork.getNetwork()) {
+				if (wifiNetwork.getMode() === 'ap') {
+					const apCard = createAccessPointCard(wifiNetwork, hostHints);
+					if (isHaLow(wifiNetwork)) {
+						cards.push(apCard);
+					} else {
+						nonHaLowCards.push(apCard);
+					}
+				} else if (wifiNetwork.getMode() === 'mesh') {
+					const meshCard = createMesh11sCard(wifiNetwork, hostHints);
+					if (isHaLow(wifiNetwork)) {
+						cards.push(meshCard);
+					} else {
+						nonHaLowCards.push(meshCard);
+					}
 				}
 			}
 		}
@@ -1218,7 +1341,7 @@ return view.extend({
 		}
 
 		// List non-HaLow APs later
-		cards.push(...nonHaLowAPCards);
+		cards.push(...nonHaLowCards);
 
 		cards.push(createModeCard(morseMode, ethernetPorts));
 		cards.push(createNetworkInterfacesCard(networks, wifiDevices));
