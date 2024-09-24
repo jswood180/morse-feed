@@ -178,8 +178,12 @@ class MorseConfigDiagram extends HTMLElement {
 			// This ensures that the next synchronise will trigger all the necessary mutation observers
 			// (otherwise a shared name from the previously active template might be something that's
 			// supposedly not necessary to change).
-			for (const attr of Array.from(this.attributes)) {
-				this.removeAttributeNode(attr);
+			if (this.observer) {
+				this.observer.disconnect();
+				for (const attr of Array.from(this.attributes)) {
+					this.removeAttributeNode(attr);
+				}
+				this.observer.observe(this, { attributes: true });
 			}
 
 			this.shadowRoot.innerHTML = this.constructor.templates[templateName];
@@ -424,9 +428,6 @@ class MorseConfigDiagram extends HTMLElement {
 		slots['STA_WIFI24_LINK'] = _('2.4GHz WiFi');
 		slots['AP_SELECT_TEXT'] = _('This Device');
 		slots['STA_SELECT_TEXT'] = _('This Device');
-		slots['MESH_UPLINK_DEVICE'] = _('Existing router');
-		slots['MESH_UPLINK_ETH_LINK'] = _('Ethernet');
-		slots['MESH_UPLINK_SOURCE'] = _('Internet');
 
 		const hostname = `<b>${config.get_first('system', 'system', 'hostname')}</b>`;
 
@@ -593,6 +594,7 @@ class MorseConfigDiagram extends HTMLElement {
 		slots['POINT_HALOW_AP_CL1'] = _('HaLow Client');
 		slots['GATE_UPLINK_DEVICE'] = _('Existing router');
 		slots['GATE_UPLINK_ETH_LINK'] = _('Ethernet');
+		slots['GATE_UPLINK_SOURCE'] = _('Internet');
 		slots['GATE_MGMT_ETH_DEVICE'] = _('Laptop/Device');
 		slots['GATE_MGMT_ETH_LINK'] = _('Ethernet');
 		slots['GATE_WIFI24_DEVICE'] = _('Laptop/Device');
