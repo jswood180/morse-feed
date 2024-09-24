@@ -439,6 +439,101 @@ h5 {
   pointer-events: none;
 }
 
+/* Styles for the cbi-filebrowser component */
+.cbi-filebrowser {
+  min-width: 210px;
+  max-width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  transition: opacity 0.25s ease-in;
+
+  &.open {
+    height: auto;
+    opacity: 1;
+    overflow: visible;
+  }
+
+  > * {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-bottom: 1px solid #ccc;
+    margin: 0.25em 0.25em 0;
+    padding: 0 0 0.25em;
+  }
+
+  > div {
+    border-bottom: none;
+  }
+
+  ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+
+    > li {
+      display: flex;
+      flex-direction: row;
+
+      &:hover {
+        background: #f5f5f5;
+      }
+
+      > div:first-child {
+        flex: 10;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      > div:last-child {
+        flex: 3;
+        text-align: right;
+
+        > button {
+          margin: 3px 0 3px 0.25em;
+          padding: 0.15em 0.25em;
+        }
+      }
+
+      > .mtime.hide-xs {
+        margin: 5px;
+      }
+    }
+  }
+
+  .upload {
+    display: flex;
+    flex-flow: row wrap;
+    border-bottom: 1px solid #ccc;
+    margin: 0 -0.125em 0.25em;
+    padding: 0 0 0.125em;
+
+    > * {
+      flex: 1;
+      margin: 0.125em;
+    }
+
+    > .btn {
+      flex-basis: 60px;
+    }
+
+    > div {
+      flex: 10;
+      min-width: 150px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  }
+}
+
 /*
 * In Edge, the input type 'password' triggers a password reveal icon,
 * while Safari displays an auto-fill icon. Both overlap with the
