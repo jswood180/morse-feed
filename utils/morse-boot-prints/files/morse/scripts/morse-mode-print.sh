@@ -69,5 +69,6 @@ print_halow_info()
 }
 
 print_halow_info
-ifconfig | grep -v 127.0.0.1 | grep -B 1 'inet addr' | sed 's/--//'
+# Show iface info only if IPv4 assigned (and skip IPv6...).
+ip a | sed -n '/127.0.0.1/d;/lo: /d;s/^[0-9]*: //p;/    link/p;/    inet /p' | grep -B 2 '    inet '
 echo
