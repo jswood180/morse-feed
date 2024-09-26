@@ -19,14 +19,14 @@ function exec_cmd(cmd) {
 	if (proc) {
 		const output = proc.read("all");
 		// If output is null, it indicates a read error
-		if (!output) {
+		if (output === null) {
 			warn(`mgmt-alias-iface: ${proc.error()}: Error reading the output of command: ${cmd}\n`);
 			proc.close();
 			return false;
 		}
 		const ret = proc.close();
-		//When the program terminated normally, it returns the positive exit code of the program. 
-		if ( !ret ) {
+		//When the program terminated normally, it returns the positive exit code of the program.
+		if ( ret === null) {
 			warn(`mgmt-alias-iface: ${proc.error()}: Error terminating command: ${cmd}\n`);
 			return false;
 		} else if (ret == 0) {
@@ -66,30 +66,30 @@ function set_up_alias_network(bridge) {
 	let existing_bridge = get_alias_bridge();
 
 	if (existing_bridge && bridge && existing_bridge !== bridge) {
-		if (!exec_cmd(`ip addr del ${mgmt_ip}/${mgmt_cidr} dev ${existing_bridge}`)) {
+		if (exec_cmd(`ip addr del ${mgmt_ip}/${mgmt_cidr} dev ${existing_bridge}`) === false) {
 			warn(`Error: Failed to remove alias from ${existing_bridge}\n`);
 		}
 	}
 
 	// Add alias to the given bridge
-	if (!exec_cmd(`ip addr add ${mgmt_ip}/${mgmt_cidr} dev ${bridge}`)) {
+	if (exec_cmd(`ip addr add ${mgmt_ip}/${mgmt_cidr} dev ${bridge}`) === false) {
 		warn(`mgmt-alias-iface: Error: Failed to add alias to ${bridge}\n`);
 		return false;
 	}
 
 	// Add firewall rules for the management IP
-	if (!exec_cmd(`nft add rule inet fw4 input ip daddr ${mgmt_ip} counter accept`)) {
+	if (exec_cmd(`nft add rule inet fw4 input ip daddr ${mgmt_ip} counter accept`) === false) {
 		warn(`mgmt-alias-iface: Error: Failed to add firewall rule for input on ${mgmt_ip}\n`);
 		return false;
 	}
 
-	if (!exec_cmd(`nft add rule inet fw4 output ip saddr ${mgmt_ip} counter accept`)) {
+	if (exec_cmd(`nft add rule inet fw4 output ip saddr ${mgmt_ip} counter accept`) === false) {
 		warn(`mgmt-alias-iface: Error: Failed to add firewall rule for output on ${mgmt_ip}\n`);
 		return false;
 	}
 
 	// Reload firewall configuration
-	if (!exec_cmd(`fw4 reload`)) {
+	if (exec_cmd(`fw4 reload`) === false) {
 		warn("mgmt-alias-iface: Error: Failed to reload firewall configuration\n");
 		return false;
 	}
