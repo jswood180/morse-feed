@@ -90,8 +90,11 @@ define Build/Compile
 		python3 $(PKG_BUILD_DIR)/regdbconverter.py -v -f csv $(PKG_BUILD_DIR)/regdb_Sub-1_GHz.tsv > artefacts/repo_channels.csv
 	)
 	mkdir -p $(PKG_BUILD_DIR)/artefacts
-	# Mash the 5g shim channels in.
-	python3 add_5g_shim_channels.py < artefacts/repo_channels.csv | $(FILTER) > $(PKG_BUILD_DIR)/artefacts/channels.csv
+	# Mash the 5g shim channels in, filter out banned countries and channels,
+	# then add primary channels based on what remains.
+	set -o pipefail; python3 add_5g_shim_channels.py < artefacts/repo_channels.csv \
+	| $(FILTER) \
+	| python3 add_primary_channels.py > $(PKG_BUILD_DIR)/artefacts/channels.csv
 endef
 
 define Package/morse-regdb/install
