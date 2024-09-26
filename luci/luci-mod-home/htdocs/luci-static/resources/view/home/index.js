@@ -717,7 +717,7 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 	const hasHostname = associatedDevices.some(d => d.hostname);
 	const hasIp = associatedDevices.some(d => d.ip);
 	const hasIp6 = associatedDevices.some(d => d.ip6);
-	const authentication = wifiNetwork.ubus('net', 'iwinfo', 'encryption').authentication || [];
+	const authentication = wifiNetwork.ubus('net', 'iwinfo', 'encryption')?.authentication || [];
 	const wifiPassword = (authentication.includes('sae') || authentication.includes('psk')) && wifiNetwork.get('key');
 
 	let connectMethods;
@@ -846,7 +846,7 @@ function createMesh11sCard(wifiNetwork, hostHints) {
 	const hasHostname = associatedDevices.some(d => d.hostname);
 	const hasIp = associatedDevices.some(d => d.ip);
 	const hasIp6 = associatedDevices.some(d => d.ip6);
-	const authentication = wifiNetwork.ubus('net', 'iwinfo', 'encryption').authentication || [];
+	const authentication = wifiNetwork.ubus('net', 'iwinfo', 'encryption')?.authentication || [];
 	const wifiPassword = (authentication.includes('sae') || authentication.includes('psk')) && wifiNetwork.get('key');
 
 	let connectMethods;
