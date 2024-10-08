@@ -9,14 +9,14 @@
 const dump_path = '/tmp/'; // filepath for dumping the files
 
 return view.extend({
-	load: function () {
+	load() {
 		return Promise.all([
 			morsenetwork.getMorseDeviceInterface(),
 			uci.load(['wireless']),
 		]);
 	},
 
-	dumpState: function () {
+	dumpState() {
 		ui.showModal(_('Getting snapshot...'), [
 			E('p', { class: 'spinning' }, _('The system is gathering required information.')),
 		]);
@@ -46,7 +46,7 @@ return view.extend({
 		);
 	},
 
-	render: function ([morseDeviceInterface]) {
+	render([morseDeviceInterface]) {
 		if (morseDeviceInterface) {
 			this.morseDeviceInterface = morseDeviceInterface;
 		} else {
@@ -59,10 +59,15 @@ return view.extend({
 			E('div', { class: 'cbi-section' }, [
 				E('h3', {}, _('Snapshots')),
 				E('p', _('Collect a snapshot of the system for the purpose of debugging any issues experienced. This can be sent to the support team for further analysis.')),
-				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, 'dumpState') }, _('Create Archive')),
 			]),
 		]);
 
 		return view;
+	},
+
+	addFooter() {
+		return E('div', { class: 'cbi-page-actions' }, [
+			E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, 'dumpState') }, _('Create Archive')),
+		]);
 	},
 });
