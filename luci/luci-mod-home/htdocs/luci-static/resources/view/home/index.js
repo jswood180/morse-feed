@@ -925,8 +925,8 @@ function createMesh11sCard(wifiNetwork, hostHints) {
 		],
 		maxContents: [
 			E('dl', [
-				E('dt', _('SSID')),
-				E('dd', wifiNetwork.getSSID()),
+				E('dt', _('Mesh ID')),
+				E('dd', wifiNetwork.getMeshID()),
 				E('dt', _('Device')),
 				E('dd', wifiNetwork.getDevice().getName()),
 				E('dt', _('IPv4')),
