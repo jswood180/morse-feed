@@ -3,222 +3,30 @@
 # Copyright (C) 2023 Morse Micro Pty Ltd. All rights reserved.
 #
 
-INTERFACE="wlan0"
-MORSE_DIR="/"
-OUTPUT_PATH="."
-DEBUG_DIR=$(date +"%F_%X")
-COMPRESS=false
-BUILD="OpenWRT"
+USAGE="
+Usage: $(basename $0) [-c] [-b build system] [-i interface] [-m morse directory path] [-o Output folder name] [-d Output file path]
+Morse Micro file and information extraction tool
+   -c                          Compress output folder to .tar.gz. (default: disabled)
+   -b BUILD SYSTEM             Build system used to compile. (default: OpenWRT; no other options supported)
+   -i INTERFACE                Network interface. (default: wlan0)
+   -m MORSE DIRECTORY PATH     Filepath to morse folder. (default: '/')
+   -o OUTPUT FOLDER NAME       Name of folder to output debug files. (default: 'YYYY-MM-DD_hh:mm:ss')
+   -d OUTPUT FILE PATH         Path to save output folder. (default: '/tmp')
+"
 
-tear_down_tmp_iface()
+bad_usage()
 {
-    if [ "$tear_down_iface" == 1 ]; then
-        iw dev "$INTERFACE" del
-    fi
-}
-
-find_morse_device() {
-    local device=$1
-    local type_morse
-    config_get type_morse $device type
-
-    if [ "$type_morse" == "morse" ]; then
-        morse_radio=$1
-        config_get morse_path $device path
-        return 1
-    fi
-}
-
-create_tmp_iface()
-{
-    . /lib/functions.sh
-    config_load wireless
-    config_foreach find_morse_device wifi-device
-
-    iwinfo_cmd="iwinfo nl80211 phyname \"path=$morse_path\""
-    phy=$(eval $iwinfo_cmd)
-    INTERFACE=tmp_"$INTERFACE"
-
-    iw phy "$phy" interface add "$INTERFACE" type managed
-    rc="$?"
-    if [ "$rc" = 0 ]; then
-        ip link set "$INTERFACE" up
-        tear_down_iface=1
-    fi
-}
-
-morse_iface_available()
-{
-    ubus_cmd="ubus call iwinfo info '{\"device\": \"$INTERFACE\"}'"
-    ubus_output=$(eval $ubus_cmd)
-
-    . /usr/share/libubox/jshn.sh
-    json_init
-    json_load "$ubus_output"
-    json_get_var hwmode hwmode
-
-    [ "$hwmode" == "ah" ] && return 1
-    return 0
-}
-
-validate_morse_iface()
-{
-    if morse_iface_available; then
-        create_tmp_iface
-    fi
-}
-
-get_dmesg()
-{
-    dmesg > dmesg.txt
-}
-
-get_versions()
-{
-    "$MORSE_DIR"morse/scripts/versions.sh > versions.txt
-}
-
-get_morsectrl_stats()
-{
-    morse_cli -i "$INTERFACE" stats -j > morsectrl_stats.json
-}
-
-get_morsectrl_channel()
-{
-    morse_cli -i "$INTERFACE" channel > morsectrl_channel.txt
-}
-
-get_iw_link()
-{
-    iw "$INTERFACE" link > iw_link.txt
-}
-
-get_iw_station_dump()
-{
-    iw "$INTERFACE" station dump > iw_station_dump.txt
-}
-
-get_iwinfo()
-{
-    iwinfo > iwinfo.txt
-}
-
-get_ifconfig()
-{
-    ifconfig > ifconfig.txt
-}
-
-get_morse_conf()
-{
-    cp "$MORSE_DIR"morse/configs/morse.conf .
-}
-
-get_log_dump()
-{
-    cp -r /var/log var_log_dump
-}
-
-get_bcf_binaries()
-{
-    cp -r /lib/firmware/morse binaries
-}
-
-get_interrupts()
-{
-    cat /proc/interrupts > interrupts.txt
-}
-
-get_gpios()
-{
-    cat /sys/kernel/debug/gpio > gpio.txt
-}
-
-get_ps()
-{
-    ps > running_procs.txt
-}
-
-get_kernel()
-{
-    cat /proc/version > kernel.txt
-}
-
-get_morse_modparams()
-{
-    cp -r /sys/module/morse/parameters modparams
-}
-
-get_cpu_and_mem_usage()
-{
-    top -n1 > cpu_and_mem_usage.txt
-}
-
-get_meminfo()
-{
-    cat /proc/meminfo > meminfo.txt
-}
-
-get_df()
-{
-    df -h > disk_usage.txt
-}
-
-get_syslog()
-{
-    logread > syslog.txt
-}
-
-get_etc_config()
-{
-    cp -r /etc/config etc_config
-}
-
-get_sys_fs_pstore()
-{
-    cp -r /sys/fs/pstore sys_fs_pstore
-}
-
-get_var_run_confs()
-{
-    mkdir var_run_confs
-    cp /var/run/*.conf var_run_confs/
-}
-
-get_mm_chip_uart_logs()
-{
-    cp /var/log/ttyAMA1.log ttyAMA1.log
-}
-
-get_prplmesh_data_model()
-{
-    ubus call Device.WiFi.DataElements _get '{"depth":"10"}' > prplmesh_data_model.json
-}
-
-get_prplmesh_conn_map()
-{
-    prplmesh_enable=$(uci get prplmesh.config.enable)
-    prplmesh_master=$(uci get prplmesh.config.master)
-    if [ "$prplmesh_enable" = 1 ] && [ "$prplmesh_master" = 1 ]; then
-        /opt/prplmesh/bin/beerocks_cli -c bml_conn_map > prplmesh_conn_map.txt
-    fi
-}
-
-usage()
-{
-    echo " "
-    echo "Usage: $(basename $0) [-c] [-b build system] [-i interface] [-m morse directory path] [-o Output folder name] [-d Output file path]"
-    echo "Morse Micro file and information extraction tool"
-    echo "   -c                          Compress output folder to .tar.gz. (default: disabled)"
-    echo "   -b BUILD SYSTEM             Build system used to compile. (default: OpenWRT)"
-    echo "                               Options:"
-    echo "                                        'buildroot'"
-    echo "                                        'OpenWRT'"
-    echo "   -i INTERFACE                Network interface. (default: wlan0)"
-    echo "   -m MORSE DIRECTORY PATH     Filepath to morse folder. (default: '/')"
-    echo "   -o OUTPUT FOLDER NAME       Name of folder to output debug files. (default: 'YYYY-MM-DD_hh:mm:ss')"
-    echo "   -d OUTPUT FILE PATH         Path to save output folder. (default: '.')"
+    echo "$1"
+    echo
+    echo "$USAGE"
     exit 1
 }
+
+INTERFACE="wlan0"
+MORSE_DIR="/"
+OUTPUT_PATH="/tmp"
+DEBUG_DIR=$(date +"%F_%X")
+COMPRESS=false
 
 optstring="cb:i:m:o:d:"
 
@@ -229,6 +37,7 @@ while getopts ${optstring} arg; do
         ;;
     b)
         BUILD="$OPTARG"
+        test "$BUILD" = OpenWRT || bad_usage "Only OpenWRT is supported as a build arg (-b)."
         ;;
     i)
         INTERFACE="$OPTARG"
@@ -243,74 +52,137 @@ while getopts ${optstring} arg; do
         OUTPUT_PATH="$OPTARG"
         ;;
     *)
-        usage
+        bad_usage "Argument ($arg) not understood."
         ;;
     esac
 done
 
-cd "$OUTPUT_PATH" || exit 1 ;
-mkdir "$DEBUG_DIR" ; cd "$DEBUG_DIR" || exit 1
+cd "$OUTPUT_PATH" || bad_usage "Output path (-o) doesn't exist."
+mkdir -p "$DEBUG_DIR" || bad_usage "Can't create output dir (-d)."
+cd "$DEBUG_DIR" || bad_usage "Can't change into output dir (-d)."
+
+find_morse_device() {
+    local device=$1
+    local type
+    config_get type $device type
+
+    if [ "$type" = morse ]; then
+        config_get phypath $device path
+        return 1
+    fi
+}
+
+find_phy()
+{
+    . /lib/functions.sh
+    config_load wireless
+    config_foreach find_morse_device wifi-device
+
+    PHY="$(iwinfo nl80211 phyname path="$phypath")"
+}
+
+morse_iface_available()
+{
+    ubus_output="$(ubus call iwinfo info "{\"device\": \"$INTERFACE\"}" 2> /dev/null)"
+    if [ -z "$ubus_output" ]; then
+        return 1
+    fi
+
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_load "$ubus_output"
+    json_get_var hwmode hwmode
+
+    test "$hwmode" == "ah"
+}
+
+PHY=
+find_phy
+
+TEARDOWN_INTERFACE=false
+if ! morse_iface_available; then
+    INTERFACE="${PHY}_mm_dump"
+    echo "Morse iface not available - attempting to add $INTERFACE."
+
+    if iw phy "$PHY" interface add "$INTERFACE" type managed; then
+        if ip link set "$INTERFACE" up; then
+            echo "Added temporary interface $INTERFACE."
+        fi
+        TEARDOWN_INTERFACE=true
+    fi
+fi
+
+# Run a command, and save the output along with explanatory text. e.g.
+#
+#   r dmesg.txt dmesg
+#
+# This is a helper so we can have a minimal list of commands below
+# (proxy for a proper data structure).
+r() {
+    output="$1"
+    shift
+    echo "Running: $* > $output 2>&1"
+    echo "# $*" > "$output"
+    "$@" >> "$output" 2>&1
+}
+
+# Save data from a location (using cp -a). e.g.
+#
+#   s /var/log
+#
+# This is a helper so we can have a minimal list of commands below
+# (proxy for a proper data structure), and must be given
+# an absolute path.
+s() {
+    for x in "$@"; do
+        if [ -e "$x" ]; then
+            echo "Saving: $x"
+            mkdir -p "files$(dirname $x)"
+            cp -a "$x" "files$x"
+        fi
+    done
+}
+
+echo "Saving info to $OUTPUT_PATH/$DEBUG_DIR"
+
+r dmesg.txt                dmesg
+r versions.txt             "$MORSE_DIR"morse/scripts/versions.sh
+r morsectrl_stats.json     morse_cli -i "$INTERFACE" stats -j
+r morsectrl_channel.txt    morse_cli -i "$INTERFACE" channel
+r iw_link.txt              iw "$INTERFACE" link > iw_link.txt
+r iw_station_dump.txt      iw "$INTERFACE" station dump
+r iwinfo.txt               iwinfo
+r iwinfo_assoclist.txt     iwinfo "$INTERFACE" assoclist
+r ifconfig.txt             ifconfig
+r ip_a.txt                 ip a
+r ip_r.txt                 ip r
+r ip_n.txt                 ip n
+r brctl_show.txt           brctl show
+r running_procs.txt        ps ww
+r cpu_and_mem_usage.txt    top -b -n1
+r disk_usage.txt           df -h
+r syslog.txt               logread
+r prplmesh_data_model.json ubus call Device.WiFi.DataElements _get '{"depth":"10"}'
+r prplmesh_conn_map.txt    /opt/prplmesh/bin/beerocks_cli -c bml_conn_map
+
+s /var/log
+s /etc/config
+s /var/run
+s /lib/firmware/morse
+s /proc/interrupts
+s /proc/version
+s /proc/meminfo
+s /sys/module/morse/parameters
+s /sys/kernel/debug/gpio
+s /sys/fs/pstore
+
+# Reading one of these parameters errors out.
+s /sys/kernel/debug/ieee80211/$PHY/morse 2> /dev/null
 
 
-case $BUILD in
-    "buildroot")
-        get_iw_link
-        get_etc_config
-        get_iw_station_dump
-        get_morsectrl_channel
-        get_dmesg
-        get_ps
-        get_meminfo
-        get_cpu_and_mem_usage
-        get_versions
-        get_morsectrl_stats
-        get_iwinfo
-        get_ifconfig
-        get_morse_conf
-        get_log_dump
-        get_bcf_binaries
-        get_interrupts
-        get_gpios
-        get_kernel
-        get_morse_modparams
-        get_df
-        ;;
-    "OpenWRT")
-        validate_morse_iface
-        get_syslog
-        get_sys_fs_pstore
-        get_var_run_confs
-        get_iw_link
-        get_etc_config
-        get_iw_station_dump
-        get_morsectrl_channel
-        get_dmesg
-        get_ps
-        get_meminfo
-        get_cpu_and_mem_usage
-        get_morsectrl_stats
-        get_iwinfo
-        get_ifconfig
-        get_log_dump
-        get_bcf_binaries
-        get_interrupts
-        get_gpios
-        get_kernel
-        get_df
-        get_morse_modparams
-        get_mm_chip_uart_logs
-        get_prplmesh_data_model
-        get_prplmesh_conn_map
-        tear_down_tmp_iface
-        ;;
-    *)
-        echo "Invalid BUILD option. Exiting..."
-        cd ../
-        rm -rf "$DEBUG_DIR"
-        exit 1
-esac
-
-
+if $TEARDOWN_INTERFACE; then
+    iw dev "$INTERFACE" del
+fi
 
 
 if $COMPRESS; then
