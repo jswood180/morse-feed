@@ -59,6 +59,6 @@ for country, rows in by_country.items():
             assert allowed_primary_indexes, f"No allowed primaries for {country}, {row['s1g_chan']}"
             row["bw2m_s1g_prim_1mhz_chan_index"] = "|".join(map(str, allowed_primary_indexes))
         else:
-            row["s1g_prim_1mhz_chan_index"] = row["s1g_chan"]
+            row["s1g_prim_1mhz_chan_index"] = "0"
 
         dw.writerow(row)
