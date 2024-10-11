@@ -383,7 +383,11 @@ drv_morse_setup() {
 		# Note that this currently guaranteed to happen on each boot
 		# (since we'll have a wlan? then).
 		set_chipid $auto_ifname
-		update_dpp_qrcode /etc/dpp_key.pem "$(cat /sys/class/ieee80211/$phy/macaddress)"
+		if [ -e /etc/dpp_key.pem ]; then
+			# The private key only exists if you include the dpp-key-recovery
+			# package.
+			update_dpp_qrcode /etc/dpp_key.pem "$(cat /sys/class/ieee80211/$phy/macaddress)"
+		fi
 
 		# Now remove wlan?, since any wlan* interfaces we want will be
 		# created by the wifi-iface sections in the uci config.

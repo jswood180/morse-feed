@@ -112,35 +112,6 @@ morse_find_ifname()
 	done
 }
 
-# this function checks if an macaddr is burnt into the device.
-# if so, returns it, otherwise returns an empty string
-morse_get_chip_macaddr()
-{
-	ifname=
-	morse_find_ifname
-	local state=$(cat /sys/class/net/${ifname}/operstate 2>/dev/null)
-	[ $? -ne 0 ] && return
-
-	if [ "$state" == "down" ]; then
-		ip link set ${ifname} up
-		[ $? -ne 0 ] && return
-	fi
-
-	local chip_macaddr="$(morse_cli -i ${ifname} macaddr 2>/dev/null)"
-	[ $? -ne 0 ] && printf ""
-	chip_macaddr=${chip_macaddr##"Chip MAC address: "}
-
-	#make sure (using regex) that the we got a macaddr
-	if [[ "$chip_macaddr" =~ ^\([0-9A-Fa-f]{2}[:]\){5}\([0-9A-Fa-f]{2}\)$ ]]; then
-		[ "$chip_macaddr" = "00:00:00:00:00:00" ] && printf "" || printf "$chip_macaddr"
-	else
-		printf ""
-	fi
-
-	if [ "$state" == "down" ]; then
-		ip link set ${ifname} down
-	fi
-}
 
 update_dpp_qrcode()
 {
@@ -150,7 +121,7 @@ update_dpp_qrcode()
 	local mac_address=$(echo "$2" | sed -r 's/://g')
 	#generate the public key string from the private key.
 	#unfortunately, there is no way to quiet the 'read EC key' messages without redirecting stderr.
-	local pubkey=$(openssl ec -in $private_key_path -pubout -conv_form compressed -outform DER 2> /dev/null | hexdump -e '16/1 "%02x " "\n"' | xxd -r -p | base64 -w0)
+	local pubkey=$(openssl ec -in $private_key_path -pubout -conv_form compressed -outform DER 2> /dev/null | base64 -w0)
 	#save qrcode string into /www
 	qrencode --inline --8bit --type=SVG --output=/tmp/dpp_qrcode.svg "DPP:V:2;M:$mac_address;K:$pubkey;;"
 	#only write if necessary
