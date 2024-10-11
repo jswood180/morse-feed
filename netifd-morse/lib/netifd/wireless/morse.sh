@@ -146,11 +146,11 @@ build_morse_mod_params(){
 }
 
 
-# If thinlmac optimisation is unset, the original settings are not restored unless the device is rebooted. 
-# This is because the user could have forced different settings (e.g. via rc.local, or by setting ipv6_disabled=0 
-# in UCI on the network device itself), and we do not want to unexpectedly interfere with these when this option 
-# is unset. Note also that it's difficult to disable IPv6 via UCI in the normal way because it needs to be done 
-# on the L3 device, and this device is not fixed for a particular wifi-iface (i.e. it might be a bridge) so there's 
+# If thinlmac optimisation is unset, the original settings are not restored unless the device is rebooted.
+# This is because the user could have forced different settings (e.g. via rc.local, or by setting ipv6_disabled=0
+# in UCI on the network device itself), and we do not want to unexpectedly interfere with these when this option
+# is unset. Note also that it's difficult to disable IPv6 via UCI in the normal way because it needs to be done
+# on the L3 device, and this device is not fixed for a particular wifi-iface (i.e. it might be a bridge) so there's
 # no clean way to push the wifi-device option into the right network device.
 apply_thin_lmac_optimization() {
 	# Disable noise from IPv6 incidental traffic
@@ -297,10 +297,10 @@ get_mesh11sd_config() {
 	json_select ..
 }
 
-get_matter_config() { 
+get_matter_config() {
 	config_load matter
 	var=
-	
+
 	json_select config
 
 	config_get var config enable
