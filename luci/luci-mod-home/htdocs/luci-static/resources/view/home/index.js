@@ -700,7 +700,7 @@ function createLocalNetworksCard(networks, dhcpLeases, hostHints) {
 	});
 }
 
-function createAccessPointCard(wifiNetwork, hostHints) {
+function createAccessPointCard(wifiNetwork, hostHints, hasQRCode) {
 	const netIface = wifiNetwork.getNetwork();
 	const bitrate = wifiNetwork.getBitRate();
 	const wifiName = getWifiName(wifiNetwork);
@@ -758,8 +758,10 @@ function createAccessPointCard(wifiNetwork, hostHints) {
 					]),
 				].filter(e => e))),
 				// Currently, we only support DPP on HaLow.
-				isHaLow(wifiNetwork) && E('dt', _('DPP QR Code')),
-				isHaLow(wifiNetwork) && E('dd', _('Scan the Client QR Code in the app.')),
+				// We disable this if there is no QRCode on this device, as if this is not
+				// there we likely aren't running dppd (currently true on HaLowLink 1).
+				hasQRCode && isHaLow(wifiNetwork) && E('dt', _('DPP QR Code')),
+				hasQRCode && isHaLow(wifiNetwork) && E('dd', _('Scan the Client QR Code in the app.')),
 				isHaLow(wifiNetwork) && E('dt', _('DPP Push button')),
 				isHaLow(wifiNetwork) && E('dd', [
 					E('button', {
@@ -1292,7 +1294,7 @@ return view.extend({
 		for (const wifiNetwork of wifiNetworks) {
 			if (!wifiNetwork.isDisabled() && wifiNetwork.isUp() && wifiNetwork.getNetwork()) {
 				if (wifiNetwork.getMode() === 'ap') {
-					const apCard = createAccessPointCard(wifiNetwork, hostHints);
+					const apCard = createAccessPointCard(wifiNetwork, hostHints, hasQRCode);
 					if (isHaLow(wifiNetwork)) {
 						cards.push(apCard);
 					} else {
