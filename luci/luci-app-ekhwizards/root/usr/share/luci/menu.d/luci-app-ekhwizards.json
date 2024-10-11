@@ -7,12 +7,19 @@
         }
     },
 
-    "admin/selectwizard": {
+    "admin/ekhwizards": {
         "title": "Wizards",
         "order": 3,
         "action": {
             "type": "template",
             "path": "morse/selectwizard",
+        }
+    },
+
+    "admin/selectwizard": {
+        "action": {
+            "type": "alias",
+            "path": "admin/ekhwizards"
         }
     },
 

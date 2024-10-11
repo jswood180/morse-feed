@@ -7,15 +7,11 @@
             "path": "morse/morseapwizard"
         }
     },
+
     "admin/selectwizard": {
         "action": {
             "type": "alias",
-            "path": "admin/morseapwizard",
-        },
-        "depends": {
-            "fs": {
-                "/usr/share/luci/menu.d/luci-app-ekhwizards.json": "absent"
-            }
+            "path": "admin/morseapwizard"
         }
-    },
+    }
 }
