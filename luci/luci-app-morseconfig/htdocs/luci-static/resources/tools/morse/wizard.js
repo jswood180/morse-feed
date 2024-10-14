@@ -167,10 +167,10 @@ function readSectionInfo() {
 
 	// privlan has been removed from all the configs, but for those upgrading we should prefer the IP address
 	// in privlan (i.e. likely 10.42.0.1) to that in lan (likely 192.168.1.1).
-	const lanIp = uci.get('network', 'privlan', 'ipaddr') || uci.get('network', 'lan', 'ipaddr') || DEFAULT_LAN_IP;
+	const lanIp = morseuci.getFirstIpaddr('privlan') || morseuci.getFirstIpaddr('lan') || DEFAULT_LAN_IP;
 	let wlanIp;
 	// Likewise, we use the IP in lan here in case we got the previous ip from privlan (it's an old config).
-	for (wlanIp of [uci.get('network', 'lan', 'ipaddr'), uci.get('network', 'ahwlan', 'ipaddr'), DEFAULT_WLAN_IP, ALTERNATE_WLAN_IP]) {
+	for (wlanIp of [morseuci.getFirstIpaddr('lan'), morseuci.getFirstIpaddr('ahwlan'), DEFAULT_WLAN_IP, ALTERNATE_WLAN_IP]) {
 		if (wlanIp && wlanIp != lanIp) {
 			break;
 		}

@@ -483,12 +483,10 @@ return view.extend({
 			// Since we don't support WDS here, and in advanced config changing
 			// the mode would let you select the WDS status (similar to our HaLow
 			// dropdown here), if we've changed let's remove WDS.
+			// Note that if nothing is changed we don't touch it here (on the
+			// principle of not nuking user config) because AbstractValue.parse
+			// only calls .write if this changes.
 			option.write = function (sectionId, value) {
-				if (this.cfgvalue(sectionId) === value) {
-					// Don't do anything if config remains unchanged.
-					return;
-				}
-
 				uci.unset('wireless', sectionId, 'wds');
 				uci.set('wireless', sectionId, 'mode', value);
 			};
@@ -496,11 +494,10 @@ return view.extend({
 			// For HaLow, add special handling to set WDS and mesh
 			// (i.e. setting ifname to mesh0 if it's a Mesh Point so mesh11sd
 			// picks it up).
+			// Note that if nothing is changed we don't touch it here (on the
+			// principle of not nuking user config) because AbstractValue.parse
+			// only calls .write if this changes.
 			option.write = function (sectionId, value) {
-				if (this.cfgvalue(sectionId) === value) {
-					// Don't do anything if config remains unchanged.
-					return;
-				}
 				switch (value) {
 					case 'ap-wds':
 						uci.set('wireless', sectionId, 'mode', 'ap');
@@ -773,11 +770,9 @@ return view.extend({
 			return (dnsSection && dhcpSection) ? '1' : '0';
 		};
 		option.write = function (sectionId, value) {
-			if (this.cfgvalue(sectionId) === value) {
-				// If there's an existing half-enabled config (e.g. DNS but not DHCP or vice-versa),
-				// we don't touch it here (on the principle of not nuking user config).
-				return;
-			}
+			// Note that if there's an existing half-enabled config (e.g. DNS but not DHCP or vice-versa),
+			// we don't touch it here (on the principle of not nuking user config) because
+			// AbstractValue.parse only calls .write if this changes.
 
 			const dnsmasqName = morseuci.getOrCreateDnsmasq(sectionId);
 			if (value === '1') {
@@ -861,6 +856,11 @@ return view.extend({
 		option.datatype = 'ip4addr("nomask")';
 		option.rmempty = false;
 		option.retain = true;
+		// Warning: this _discards_ other IPs (and mask info) in the load.
+		// We rely on the standard behaviour of the form to not attempt to write
+		// values that haven't changed to avoid unexpected mutations; however,
+		// if the user edits this value then all bets are off.
+		option.load = sectionId => morseuci.getFirstIpaddr(sectionId);
 		option.validate = function (sectionId, value) {
 			// Prevent users setting different networks to the same IP.
 			// This is valid, but too confusing.
@@ -898,6 +898,22 @@ return view.extend({
 		// IMO this is a bug in LuCI, but for now we work around it.
 		option.retain = true;
 		option.validate = staticProtocol.CBINetmaskValue.prototype.validate;
+		option.load = (sectionId) => {
+			const netmask = morseuci.getFirstNetmask(sectionId);
+			if (netmask && netmask !== uci.get('network', sectionId, 'netmask')) {
+				// We must have extracted the netmask from the IP. If the user
+				// edits the IP in our system, we should keep the same netmask
+				// as before (and make sure it's set), which means putting it in
+				// its own option correctly. For now, just force it all the time,
+				// as it's not straightforward to only do it if ipaddr has changed
+				// (it will be ignored if the mask is set on ipaddrs anyway).
+				//
+				// NB We can't use forcewrite, because this field is often not used
+				// (max_cols again).
+				uci.set('network', sectionId, 'netmask', netmask);
+			}
+			return netmask;
+		};
 
 		option = section.option(staticProtocol.CBIGatewayValue, 'gateway', _('Gateway'));
 		option.description = GATEWAY_DESCRIPTION;

@@ -1,7 +1,8 @@
 'use strict';
-/* globals baseclass uci */
+/* globals baseclass uci network */
 'require baseclass';
 'require uci';
+'require network';
 
 /* Various helpers so we can interact more easily with uci.
  *
@@ -388,6 +389,45 @@ function ensureNetworkExists(sectionId) {
 	getOrCreateZone(sectionId);
 }
 
+/* Get the first ipaddr/netmask for an interface from UCI.
+ *
+ * uci supports multiple ip addresses in a somewhat confusing (bad?) way:
+ *   ipaddr = x.x.x.x and netmask = x.x.x.x
+ *   ipaddr = [x.x.x.x/y, x.x.x.x/y] (and netmask is ignored)
+ * For our purposes, we mostly want to not care about the second option as it
+ * makes our interfaces more complex. However, we need to be able to load it successfully.
+ * Hence this function, which pretends that the second format is the same as the first,
+ * discarding any subsequent IP/masks.
+ */
+function getFirstIpaddrAndNetmask(iface) {
+	let netmask = uci.get('network', iface, 'netmask');
+	let ipaddr = uci.get('network', iface, 'ipaddr');
+
+	if (Array.isArray(ipaddr)) {
+		ipaddr = ipaddr[0];
+	}
+
+	if (ipaddr) {
+		const ipaddrSplit = ipaddr.split('/');
+		if (ipaddrSplit.length == 2) {
+			ipaddr = ipaddrSplit[0];
+			netmask = network.prefixToMask(ipaddrSplit[1]);
+		}
+	}
+
+	return { ipaddr, netmask };
+}
+
+function getFirstIpaddr(iface) {
+	const { ipaddr } = getFirstIpaddrAndNetmask(iface);
+	return ipaddr;
+}
+
+function getFirstNetmask(iface) {
+	const { netmask } = getFirstIpaddrAndNetmask(iface);
+	return netmask;
+}
+
 return baseclass.extend({
 	getZoneForNetwork,
 	getOrCreateZone,
@@ -407,4 +447,6 @@ return baseclass.extend({
 	getDefaultWifiKey,
 	getRandomMAC,
 	getFakeMorseMAC,
+	getFirstIpaddr,
+	getFirstNetmask,
 });

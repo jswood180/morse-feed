@@ -80,6 +80,14 @@ function slotDataToText(slotData) {
 	return lines.join('\n');
 }
 
+function getFirstIpaddr(ipaddr) {
+	if (Array.isArray(ipaddr)) {
+		ipaddr = ipaddr[0];
+	}
+
+	return ipaddr?.split('/')[0];
+}
+
 /* Represent the device configuration with some indication of general topology.
  *
  * We use an SVG file as a template which has named slots for various textual bits
@@ -218,6 +226,10 @@ class MorseConfigDiagram extends HTMLElement {
 			network = config.sections('network', 'interface').find(s => s['device'] === network['master']);
 		}
 
+		if (network) {
+			network['first_ipaddr'] = getFirstIpaddr(network['ipaddr']);
+		}
+
 		const dhcp = !network ? undefined : config.sections('dhcp', 'dhcp').find(s => s['interface'] === network['.name']);
 
 		return { wifi, network, dhcp };
@@ -236,6 +248,8 @@ class MorseConfigDiagram extends HTMLElement {
 
 			const devices = bridge ? bridge.ports : [network.device];
 			if (ethernetPorts.some(p => devices.includes(p.device))) {
+				network['first_ipaddr'] = getFirstIpaddr(network['ipaddr']);
+
 				return {
 					network,
 					dhcp: config.sections('dhcp', 'dhcp').find(s => !s.interface || s.interface === network['.name']),
@@ -277,14 +291,14 @@ class MorseConfigDiagram extends HTMLElement {
 		if (info.network) {
 			switch (info.network['proto']) {
 				case 'static':
-					if (info.network['ipaddr']) {
-						slot['IP'] = info.network['ipaddr'];
+					if (info.network['first_ipaddr']) {
+						slot['IP'] = info.network['first_ipaddr'];
 					}
 					if (info.dhcp && info.dhcp.ignore !== '1') {
 						slot['IPMethod'] = _('DHCP Server');
 
-						if (info.network['ipaddr']) {
-							externalSlot['IP'] = info.network['ipaddr'].replace(/\d+$/, 'x');
+						if (info.network['first_ipaddr']) {
+							externalSlot['IP'] = info.network['first_ipaddr'].replace(/\d+$/, 'x');
 						}
 					}
 					break;
