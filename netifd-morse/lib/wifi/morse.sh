@@ -131,6 +131,10 @@ EOF
 			morse,artini)
 				bcf=bcf_mm_hl1.bin
 			;;
+			morse,ekh01-mf13455)
+				bcf=bcf_mf13455.bin
+	                ;;
+
 		esac
 
 		[ -n "${bcf}" ] && uci -q set wireless.radio${devidx}.bcf="${bcf}"
