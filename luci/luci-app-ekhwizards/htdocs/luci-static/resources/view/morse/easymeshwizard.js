@@ -162,7 +162,7 @@ return wizard.AbstractWizardView.extend({
 		const bridgeMode = () => {
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
 			uci.set('wireless', morseBackhaulStaName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'interface', 'ahwlan');
+			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isWifiAp) {
 				uci.set('wireless', wifiApInterfaceName, 'network', 'ahwlan');
@@ -177,7 +177,7 @@ return wizard.AbstractWizardView.extend({
 		const nonBridgeMode = () => {
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
 			uci.set('wireless', morseBackhaulStaName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'interface', 'ahwlan');
+			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isWifiAp) {
 				uci.set('wireless', wifiApInterfaceName, 'network', 'lan');

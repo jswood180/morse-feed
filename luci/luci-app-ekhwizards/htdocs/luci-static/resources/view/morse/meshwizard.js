@@ -135,7 +135,7 @@ return wizard.AbstractWizardView.extend({
 			morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
 			uci.set('wireless', morseInterfaceName, 'wds', '1');
-			uci.set('camera-onvif-server', 'interface', 'ahwlan');
+			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isMeshAp) {
 				uci.set('wireless', morseMeshApInterfaceName, 'network', 'ahwlan');
@@ -155,7 +155,7 @@ return wizard.AbstractWizardView.extend({
 		const nonBridgeMode = () => {
 			morseuci.setNetworkDevices('lan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'interface', 'ahwlan');
+			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			// Unlike the 'normal' wizard, if we're a mesh gate
 			// NOT bridging ethernet/mesh we still bridge the APs.
