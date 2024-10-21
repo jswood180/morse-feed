@@ -1,0 +1,89 @@
+#!/bin/sh
+
+set -euo pipefail
+
+MTD=$(grep '"factory"' /proc/mtd | cut -d: -f1)
+if [ -z "$MTD" ]; then
+    echo "No factory partition found"
+    exit 1
+fi
+
+TEMPFILE=$(mktemp)
+LOADED=0
+
+load() {
+    if [ "$LOADED" -eq 1 ]; then
+        return
+    fi
+    cp "/dev/$MTD" "$TEMPFILE"
+    LOADED=1
+}
+
+store() {
+    if [ "$LOADED" -eq 0 ]; then
+        return
+    fi
+    insmod mtd-rw i_want_a_brick=1
+    mtd write "$TEMPFILE" factory
+    rmmod mtd-rw
+    rm "$TEMPFILE"
+}
+
+# args: addr(decimal) file
+print_word() {
+    dd bs=1 iflag=skip_bytes "skip=$1" count=2 "if=$2" 2> /dev/null | hexdump -e \""$(printf "[0x%04x]:0x" "$addr")"\"' 1/2 "%04X\n"' | tr a-z A-Z
+}
+
+# print the hex string argument as the binary value it represents
+# max value FFFF
+hex_to_bin() {
+    b0=$((0x$1 % 256))
+    b1=$((0x$1 / 256))
+    printf "\\x$(printf "%x" "$b0")\\x$(printf "%x" "$b1")"
+}
+
+do_write() {
+    # addr is hex string without 0x, convert to int.
+    local addr=$((0x$1))
+    # value is a hex string without 0x.
+    local value="$2"
+    load
+    hex_to_bin "$value" | dd of="$TEMPFILE" bs=1 seek="$addr" conv=notrunc 2> /dev/null
+
+    printf "-"
+    print_word "$addr" "/dev/$MTD"
+    printf "+"
+    print_word "$addr" "$TEMPFILE"
+}
+
+do_one() {
+    local addr="${1%=*}"
+    if [ "$1" != "$addr" ]; then
+        do_write "$addr" "${1#*=}"
+    else
+        # addr is a hex string without 0x, convert to int.
+        addr=$((0x$addr))
+        # recreate `iwpriv ra0 e2p 31` output like:
+        # [0x0031]:0xC168
+        print_word "$addr" "/dev/$MTD"
+    fi
+}
+
+if [ "${1:-x}" = "--help" ]; then
+    echo "Usage: $0 [addr]|[addr=value]*"
+    echo "  addr: read 2 byte value from addr"
+    echo "  addr=value: write 2 byte value to addr"
+    echo "  both addr and value are in hex without a leading 0x"
+    exit 0
+fi
+
+if [ $# -eq 0 ]; then
+    # recreate `iwpriv ra0 e2p` output like:
+    # [0x0000]:7628  [0x0002]:0200  [0x0004]:D8B8  [0x0006]:6712
+    hexdump -n 512 -v -e '"[0x%04_ax]:" 1/2 "%04X  " "[0x%04_ax]:"1/2 "%04X  " "[0x%04_ax]:" 1/2 "%04X  " "[0x%04_ax]:" 1/2 "%04X\n"' /dev/"$MTD" | tr a-z A-Z
+else
+    for arg; do
+        do_one "$arg"
+    done
+    store
+fi
