@@ -11,16 +11,7 @@ ubenv_key=$(persistent_vars_storage.sh READ dpp_priv_key)
 # used by /etc/init.d/dpp-key-recovery
 
 if [ -z "$ubenv_key" ]; then
-    echo "dpp-key-recovery: DPP private key isn't found in persistent storage." > /dev/kmsg
-fi
-
-if ! openssl ec -in $dpp_key_tmp_file -check 1>/dev/null 2>/dev/null; then
-    echo "dpp-key-recovery: persistent storage contains an incorrect DPP private key." > /dev/kmsg
-    ubenv_key=
-fi
-
-if [ -z "$ubenv_key" ]; then
-    echo "dpp-key-recovery: generating a new private key and saving it to the persistent storage." > /dev/kmsg
+    echo "dpp-key-recovery: DPP private key isn't found in persistent storage. Generating new key." > /dev/kmsg
     ubenv_key=$(openssl ecparam -genkey -name prime256v1 -noout -outform DER | base64 -w0)
     /sbin/persistent_vars_storage.sh WRITE dpp_priv_key "$ubenv_key"
 fi
