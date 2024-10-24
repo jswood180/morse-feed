@@ -4,7 +4,7 @@ START=99
 boot() {
 	(
 		# Wait so that the network settles, including association/DHCP client.
-		sleep 15
+		sleep 25
 		# Send output to TMPFILE to avoid /dev/kmsg interleaving from other outputs.
 		TMPFILE="$(mktemp)"
 		/morse/scripts/morse-mode-print.sh > "$TMPFILE"
