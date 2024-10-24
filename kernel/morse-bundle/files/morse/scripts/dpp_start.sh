@@ -54,6 +54,7 @@ perform_dpp_actions() {
 	fi
 
 	if [ -n "$dpp_push_btn_cmd" ]; then
+		sleep 1  # Wait a sec for wpa_event_listener to be listening
 		$dpp_push_btn_cmd dpp_push_button
 		# Check the result of the dpp push button command
 		if [ $? -eq 0 ]; then
