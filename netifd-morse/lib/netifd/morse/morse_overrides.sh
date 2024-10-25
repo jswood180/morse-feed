@@ -776,6 +776,7 @@ morse_override_wpa_supplicant_add_network() {
 		;;
 	esac
 
+	set_default fils 0
 	set_default ieee80211r 0
 	set_default multi_ap 0
 
