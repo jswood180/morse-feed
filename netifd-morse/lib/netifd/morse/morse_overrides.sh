@@ -142,6 +142,8 @@ morse_override_hostapd_set_bss_options() {
 	json_for_each_item append_acct_server acct_server
 	json_for_each_item append_radius_acct_req_attr radius_acct_req_attr
 
+	[ -n "$ocv" ] && append bss_conf "ocv=$ocv" "$N"
+
 	case "$auth_type" in
 		sae|owe|eap2|eap192)
 			set_default ieee80211w 2
@@ -764,8 +766,6 @@ morse_override_wpa_supplicant_add_network() {
 		json_get_var owe_group 1
 		json_select ..
 	fi
-
-	[ -n "$ocv" ] && append bss_conf "ocv=$ocv" "$N"
 
 	case "$auth_type" in
 		sae|owe|eap2|eap192)
