@@ -7,29 +7,30 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=morse-leds
+PKG_NAME:=morse-led-rgb
 PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/morse-leds
+define Package/morse-led-rgb
   SECTION:=utils
   CATEGORY:=Base system
-  TITLE:=Morse Micro LED Functionality
+  TITLE:=Morse Micro RGB LED Functionality
   MAINTAINER:=Morse Micro
 endef
 
-define Package/morse-modeswitch-button/description
-  Override default LED state handler for Morse devices.
+define Package/morse-led-rgb/description
+  Override default LED state handler if you have a single
+  RGB LED (with separate R/G/B in device tree).
 endef
 
 define Build/Compile
 
 endef
 
-define Package/morse-leds/install
+define Package/morse-led-rgb/install
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_BIN) ./files/etc/diag_override.sh $(1)/etc/
 endef
 
-$(eval $(call BuildPackage,morse-leds))
+$(eval $(call BuildPackage,morse-led-rgb))
