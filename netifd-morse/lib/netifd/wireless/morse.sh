@@ -483,7 +483,11 @@ drv_morse_setup() {
 	# If no interfaces, it doesn't matter if we don't set these
 	# (since they won't be used).
 	if [ -n "$ifname" ]; then
-		morse_cli -i $ifname ampdu $ampdu
+		if [ "$ampdu" = 1 ]; then
+			morse_cli -i $ifname ampdu enable
+		else
+			morse_cli -i $ifname ampdu disable
+		fi
 		[ -n "$bss_color" ] && morse_cli -i $ifname bsscolor $bss_color
 	fi
 
