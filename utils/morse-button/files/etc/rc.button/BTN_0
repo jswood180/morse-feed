@@ -1,46 +1,34 @@
 #!/bin/sh
 # This is based on the openwrt rc.button/reset script
 
-. /lib/functions/leds.sh
-
-flash_fast() {
-	led="$(get_dt_led boot)"
-	led_off "$led"
-	led="$(get_dt_led failsafe)"
-	led_off "$led"
-	led="$(get_dt_led upgrade)"
-	led_timer "$led" 100 100
-}
-
-flash_slow() {
-	led="$(get_dt_led failsafe)"
-	led_off "$led"
-	led="$(get_dt_led boot)"
-	led_off "$led"
-	led="$(get_dt_led upgrade)"
-	led_timer "$led" 500 500
-}
+. /etc/diag.sh
 
 case "$ACTION" in
 pressed)
-	return 10
+	return 5
 ;;
 timeout)
 	if [ "$SEEN" -ge 10 ]
 	then
-		logger -t button -p daemon.notice "factory rebooting due to button press"
-		flash_fast
-		jffs2reset -y && reboot &
+		set_state factory_reset
+		return 0
+	elif [ "$SEEN" -ge 5 ]
+	then
+		set_state rebooting
+		return 5
 	fi
 ;;
 released)
-	if [ "$SEEN" -lt 5 ]
+	if [ "$SEEN" -lt 2 ]
 	then
 		/morse/scripts/dpp_start.sh
-	elif [ "$SEEN" -lt 10 ]
+	elif [ "$SEEN" -ge 10 ]
+	then
+		logger -t button -p daemon.notice "factory resetting due to button press"
+		jffs2reset -y && reboot
+	elif [ "$SEEN" -ge 5 ]
 	then
 		logger -t button -p daemon.notice "rebooting due to button press"
-		flash_slow
 		sync
 		reboot
 	fi
