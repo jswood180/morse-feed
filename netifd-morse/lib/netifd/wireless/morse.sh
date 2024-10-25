@@ -804,7 +804,7 @@ morse_vap_cleanup() {
 	for wdev in $vaps; do
 		[ "$service" != "none" ] && kill_wait $service &> /dev/null
 		ip link set dev "$wdev" down 2>/dev/null
-		iw dev "$wdev" del
+		iw dev "$wdev" del 2>/dev/null
 	done
 }
 
