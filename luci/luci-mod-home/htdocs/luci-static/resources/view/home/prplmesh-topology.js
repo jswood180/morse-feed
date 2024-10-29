@@ -208,7 +208,7 @@ class PrplmeshTopologyGraph {
 						}
 
 						graph.addLink(idMap[device.ID], id, {
-							signalStrength: sta.SignalStrength,
+							signalStrength: (sta.SignalStrength / 2) - 110, // Formula according to 802.11-2016 conversion table (Table 9-154)
 						});
 					}
 				}
@@ -287,7 +287,7 @@ class PrplmeshTopologyGraph {
 			.link((link) => {
 				const titleLine = Viva.Graph.svg('line').attr('stroke-width', 20).attr('stroke', 'black').attr('stroke-opacity', 0);
 				const title = Viva.Graph.svg('title');
-				title.textContent = `Signal strength: ${link.data?.signalStrength}`;
+				title.textContent = `RSSI: ${link.data?.signalStrength}dBm`;
 				titleLine.append(title);
 				const g = Viva.Graph.svg('g');
 				g.append(Viva.Graph.svg('line').attr('stroke', 'black').attr('stroke-width', 2));
