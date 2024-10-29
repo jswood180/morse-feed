@@ -7,7 +7,7 @@ USE_PROCD=1
 
 SERVICE=camera-onvif-server
 
-. /lib/functions/network.sh
+. "${IPKG_INSTROOT}/lib/functions/network.sh"
 
 # Frustratingly procd reports that there is an error after using procd_append_param error
 # but doesn't tell you what the error is. You can find the error doing something like:
