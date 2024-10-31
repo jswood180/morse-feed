@@ -1,0 +1,10 @@
+{
+	"luci-app-rangetest": {
+		"description": "Grant access to the LuCI range test app",
+		"read": {
+			"ubus": {
+				"morse-mode": [ "query" ]
+			}
+		}
+	}
+}
