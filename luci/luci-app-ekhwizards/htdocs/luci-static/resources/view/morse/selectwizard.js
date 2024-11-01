@@ -19,7 +19,7 @@ return view.extend({
 	},
 
 	async abort() {
-		if (uci.get('luci', 'main', 'homepage') === L.env.requestpath.join('/')) {
+		if ([L.env.requestpath.join('/'), 'admin/selectwizard'].includes(uci.get('luci', 'main', 'homepage'))) {
 			await wizard.directUciRpc.delete('luci', 'main', 'homepage');
 			await wizard.directUciRpc.commit('luci');
 		}
