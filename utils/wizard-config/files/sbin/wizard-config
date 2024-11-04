@@ -79,7 +79,8 @@ the following commands. These should only be needed for development and
 testing:
 
     wizard_config _apply_config "JSONBLOB"
-    wizard_config _find_service_url
+    wizard_config _find_service_urls
+    wizard_config _fetch_config url1 url2
     wizard_config _umdns_configure
     wizard_config _generate_config
 
@@ -119,9 +120,14 @@ const UMDNS_CONFIG = {
 	},
 };
 
+/* This IP is automatically set, but isn't likely to be addressable from
+ * the device (and probably points to itself, which is dangerous if it
+ * has an old wizard-config.json left around!).
+ */
+const MANAGEMENT_ALIAS_IP = '10.22.121.111';
 
 const UMDNS_RETRY_LIMIT = 5;
-const HTTP_RETRY_LIMIT = 5;
+const HTTP_RETRY_LIMIT = 3;
 
 
 /* Find all services of a particular type via mDNS.
@@ -164,54 +170,12 @@ function find_services(ubus, service) {
 }
 
 
-/* Find the 'best' service of those available.
- *
- * This is the first one to have the server_ip, or just the first one.
- */
-function get_best_service(services, dhcp_server_ipv4) {
-	for (let service in services) {
-		if (service.ipv4 && index(service.ipv4, dhcp_server_ipv4) != -1) {
-			return service;
-		}
-	}
-
-	return services[0];
-}
-
-
-/* Extract the HTTP configurator URL from the mDNS record.
- */
-function get_url_from_service(service) {
-	let address;
-	if (service.ipv4 && length(service.ipv4) > 0) {
-		address = service.ipv4[0];
-	} else if (service.ipv6 && length(service.ipv6) > 0) {
-		// TODO: test this codepath.
-		// I have only done IPv4 configuration.
-		address = `[${service.ipv6[0]}]`;
-	}
-
-	let port = service.port;
-
-	let path;
-	for (let txt in service.txt) {
-		txt = split(txt, "=");
-		if (txt[0] === "path_v1") {
-			path = txt[1];
-		}
-	}
-
-	if (address && port && path) {
-		return `http://${address}:${port}${path}`;
-	} else {
-		return null;
-	}
-}
-
-
 /* Fetch config from URL.
  *
  * Return a string if failure, a JSON blob on success. This is so we can easily retry.
+ *
+ * When OpenWrt 24 is released, this can be migrated to ucode-mod-uclient rather than
+ * having to use popen.
  */
 function fetch_config_once(url) {
 	// It seems there's no good way to do a popen without passing through the shell (!!!).
@@ -219,23 +183,23 @@ function fetch_config_once(url) {
 	// sure there are no single quotes.
 	const proc = popen(`uclient-fetch -T 2 -q -O - '${replace(url, "'", "%27")}'`);
 	if (!proc) {
-		return `Unable to request expected file (${url}): ${error()}\n`;
+		return `Unable to request expected file (${url}): ${error()}`;
 	}
 
 	const raw_config = proc.read("all");
 	if (raw_config === null) {
-		return `Unable to read output from URL: ${proc.error()}\n`;
+		return `Unable to read output from ${url}: ${proc.error()}`;
 	}
 
 	const proc_code = proc.close();
 	if (proc_code !== 0) {
-		return `uclient-fetch had error: ${proc_code}\n`;
+		return `uclient-fetch had error (${url}): ${proc_code}`;
 	}
 
 	try {
 		return json(raw_config);
 	} catch (e) {
-		return `Configurator gave invalid JSON: ${raw_config}\n"`;
+		return `Configurator gave invalid JSON (${url}): ${raw_config}"`;
 	}
 }
 
@@ -391,34 +355,63 @@ function commit_config(ubus, uci) {
 }
 
 
-/* Get the config from the url.
+/* Get the config from the urls (trying each in order).
  */
-function fetch_config(url) {
-	let result;
-	for (let i = 0; i < HTTP_RETRY_LIMIT; ++i) {
-		result = fetch_config_once(url);
-		if (type(result) === "object") { 
-			return result;
-		}
-		sleep(500);
-	}
-
-	die(`Unable to load config url ${url}; error: ${result}\n`);
-};
-
-
-function find_service_url(ubus, dhcp_server_ipv4) {
-	const services = find_services(ubus, SERVICE);
-	if (!services || length(services) === 0) {
-		print(`Unable to find a '${SERVICE}' service; doing nothing\n`);
+function fetch_config(urls) {
+	if (length(urls) === 0) {
+		warn(`ERROR: Unable to find any ${SERVICE} services\n`);
 		exit(1);
 	}
 
-	const url = get_url_from_service(get_best_service(services, dhcp_server_ipv4));
-	assert(url, `Unable to construct valid wizard config URL from service: ${services}\n`);
+	let result;
+	for (let url in urls) {
+		for (let i = 0; i < HTTP_RETRY_LIMIT; ++i) {
+			result = fetch_config_once(url);
+			if (type(result) === "object") { 
+				return result;
+			}
+			warn(result, "\n");
+			sleep(200);
+		}
+	}
 
-	return url;
+	warn(`ERROR: Unable to load ${SERVICE} url ${url}; last error: ${result}\n`);
+	exit(1);
 };
+
+
+function find_service_urls(ubus, dhcp_server_ipv4) {
+	const services = find_services(ubus, SERVICE) || [];
+
+	const urls = [];
+	for (let service in services) {
+		const ips = [];
+		if (service.ipv4) {
+			push(ips, ...filter(service.ipv4, ip => ip !== MANAGEMENT_ALIAS_IP));
+		}
+
+		let port = service.port;
+
+		let path;
+		for (let txt in service.txt) {
+			txt = split(txt, "=");
+			if (txt[0] === "path_v1") {
+				path = txt[1];
+			}
+		}
+
+		for (let ip in ips) {
+			const url = `http://${ip}:${port}${path}`;
+			if (ip === dhcp_server_ipv4) {
+				unshift(urls, url);
+			} else {
+				push(urls, url);
+			}
+		}
+	}
+
+	return urls;
+}
 
 
 /* Write string to fname only if file is not already there with the specified contents.
@@ -522,7 +515,7 @@ function check_umdns_running(ubus) {
  */
 const COMMANDS = {
 	client: (ubus, uci, dhcp_server_ipv4) => {
-		apply_config(uci, fetch_config(find_service_url(ubus, dhcp_server_ipv4)));
+		apply_config(uci, fetch_config(find_service_urls(ubus, dhcp_server_ipv4)));
 		commit_config(ubus, uci);
 	},
 
@@ -560,8 +553,12 @@ const COMMANDS = {
 		print(generate_config(uci), "\n");
 	},
 
-	_find_service_url: (ubus, _uci, dhcp_server_ipv4) => {
-		print(find_service_url(ubus, dhcp_server_ipv4), "\n");
+	_fetch_config: (_ubus, uci, ...urls) => {
+		print(fetch_config(urls));
+	},
+
+	_find_service_urls: (ubus, _uci, dhcp_server_ipv4) => {
+		print(find_service_urls(ubus, dhcp_server_ipv4), "\n");
 	},
 };
 
