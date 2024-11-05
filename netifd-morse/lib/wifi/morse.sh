@@ -63,6 +63,39 @@ check_morse_device() {
 	[ "$phy" = "$dev" ] && found=1
 }
 
+# This approach was copied from wireless/morse.sh. See APP-3700.
+#  - why are we putting the chipid in system.notes?
+#  - why are we then pretending system.notes is always just the chipid?
+#  - why are overwriting any changes to system.notes that the user makes?
+#  - what happens if we have more than one morse chip?
+# It's currently used in the luci status plugin.
+set_chipid() {
+	local phy=$1
+
+	iw phy "$phy" interface add wlan_chipid type managed
+	ip link set wlan_chipid up
+
+	local chip_revision
+	chip_revision="$(morse_cli -i wlan_chipid hw_version 2> /dev/null)"
+	if [ $? -eq 0 ]; then
+		# On fast devices, it's possible for this hotplug to run before
+		# config_generate (which runs immediately after the module load)
+		# has created the config files. Since config_generate will only run if
+		# /etc/config/system doesn't exist, we must wait until
+		# it's created it. Yet another reason not to store in system.notes.
+		local retries=10
+		while [ "$retries" -gt 0 ] && ! uci -q get 'system.@system[0]' > /dev/null; do
+			sleep 0.5
+			retries=$((retries - 1))
+		done
+
+		uci set system.@system[0].notes="${chip_revision##"HW Version: "}"
+		uci commit system
+	fi
+
+	iw dev wlan_chipid del
+}
+
 detect_morse() {
 	devidx=0
 	config_load wireless
@@ -77,6 +110,8 @@ detect_morse() {
 
 		# Only configure morse devices.
 		basename "$(readlink -f "$_dev/device/driver/")" | grep '^morse_' || continue
+
+		set_chipid "$(basename "$_dev")"
 
 		dev="${_dev##*/}"
 

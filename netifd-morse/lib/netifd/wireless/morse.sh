@@ -376,13 +376,6 @@ drv_morse_setup() {
 	# happens in two situations: boot, and a module load above.
 	auto_ifname=$(morse_get_ifname "$phy")
 	if [ $auto_ifname ]; then
-		# As a happy byproduct of the bonus wlan?, we can interact
-		# without module to determine the MAC and chip id.
-		# This is an ugly place to do this, since we really only
-		# need to do it once.
-		# Note that this currently guaranteed to happen on each boot
-		# (since we'll have a wlan? then).
-		set_chipid $auto_ifname
 		if [ -e /etc/dpp_key.pem ]; then
 			# The private key only exists if you include the dpp-key-recovery
 			# package.
@@ -1234,29 +1227,6 @@ morse_generate_mac() {
 		$1 $2 $3 $4 \
 		$(( (0x$5 + $off2) % 0x100 )) \
 		$(( (0x$6 + $id) % 0x100 ))
-}
-
-set_chipid() {
-	local _ifname=$1
-	local state
-	state="$(cat /sys/class/net/${_ifname}/operstate 2>/dev/null)"
-	[ $? -ne 0 ] && return
-
-	if [ "$state" == "down" ]; then
-		ip link set ${_ifname} up
-		[ $? -ne 0 ] && return
-	fi
-	local chip_revision
-	chip_revision="$(morse_cli -i ${_ifname} hw_version 2>/dev/null)"
-	[ $? -ne 0 ] && return
-	chip_revision=${chip_revision##"HW Version: "}
-
-	uci set system.@system[0].notes="${chip_revision}"
-	uci commit system
-
-	if [ "$state" == "down" ]; then
-		ip link set ${_ifname} down
-	fi
 }
 
 add_driver morse
