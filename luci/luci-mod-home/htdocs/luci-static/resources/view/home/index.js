@@ -483,7 +483,7 @@ async function createUplinkCard(netIface, hasQRCode) {
 				? E('div', { class: 'main-image' }, [
 					E('img', {
 						'style': 'cursor: help',
-						'data-tooltip': _('Scan this QR Code in the app to connect this device to your HaLow Point'),
+						'data-tooltip': _('Scan this QR Code in the app to connect this device to your HaLow Access Point'),
 						'src': DPP_QRCODE_PATH,
 					}),
 				])
