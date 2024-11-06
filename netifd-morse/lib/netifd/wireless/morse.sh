@@ -352,11 +352,13 @@ drv_morse_setup() {
 	MOD_PARAMS=
 	build_morse_mod_params
 
+	local inserted_module=0
 	if [ -n "$country" ]; then
 		if change_module_parameters || ! is_module_loaded; then
 			is_module_loaded && rmmod morse
 			set_boost_gpio $vfem_4v3
 			/sbin/kmodloader /etc/modules.d/morse
+			inserted_module=1
 		fi
 		# don't do iw reg set as in mac80211
 	fi
@@ -372,37 +374,23 @@ drv_morse_setup() {
 		fi
 	done
 
-	# wlan? is automatically created on module insertion, which usually
-	# happens in two situations: boot, and a module load above.
-	auto_ifname=$(morse_get_ifname "$phy")
-	if [ $auto_ifname ]; then
-		if [ -e /etc/dpp_key.pem ]; then
-			# The private key only exists if you include the dpp-key-recovery
-			# package.
-			update_dpp_qrcode /etc/dpp_key.pem "$(cat /sys/class/ieee80211/$phy/macaddress)"
-		fi
+	# wlan? is automatically created on module insertion, but will
+	# usually have been cleaned up by the hotplug. However, if we've
+	# just inserted the module, wait a little for the hotplug to run
+	# so we (a) can claim wlan? and (b) don't have our interfaces
+	# deleted by the hotplug (unlikely, but theoretically possible).
+	if [ "$inserted_module" = 1 ]; then
+		retries=4
+		while [ -d "/sys/class/ieee80211/$phy/device/net" ] && [ "$retries" -gt 0 ]; do
+			sleep 0.5
+			retries="$((retries - 1))"
+		done
+	fi
 
-		# Now remove wlan?, since any wlan* interfaces we want will be
-		# created by the wifi-iface sections in the uci config.
-		iw dev "$auto_ifname" del
-		# If we didn't come up as wlan0, wait around for a bit and
-		# hope that whoever has wlan0 gives it up. Since OpenWrt's
-		# default naming is phy-role (e.g. phy0-ap0), the usual way
-		# this happens is another wifi module getting wlan0 on insertion.
-		# Note that this is not guaranteed to work in all situations!
-		if [ "$auto_ifname" != wlan0 ]; then
-			echo 'Waiting to see if wlan0 becomes available'
-			retries=4
-			while [ -e "/sys/class/net/wlan0" ]; do
-				if [ "$retries" -le 0 ]; then
-					echo "wlan0 still used after waiting"
-					break
-				fi
-
-				sleep 0.5
-				retries="$((retries - 1))"
-			done
-		fi
+	if [ -e /etc/dpp_key.pem ]; then
+		# The private key only exists if you include the dpp-key-recovery
+		# package.
+		update_dpp_qrcode /etc/dpp_key.pem "$(cat "/sys/class/ieee80211/$phy/macaddress")"
 	fi
 
 	json_add_object data
@@ -662,18 +650,6 @@ morse_iface_bringup() {
 		;;
 	esac
 
-}
-
-morse_get_ifname()
-{
-	local _phy=$1
-	local _oldifname="$(basename "/sys/class/ieee80211/${_phy}/device/net"/* 2>/dev/null)"
-
-	if [[ "$_oldifname" == "wlan"* ]]; then
-		echo "$_oldifname"
-	else
-		echo ""
-	fi
 }
 
 _find_free_ifname()
