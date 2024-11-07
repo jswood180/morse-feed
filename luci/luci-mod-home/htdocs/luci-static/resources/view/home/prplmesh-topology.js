@@ -197,25 +197,35 @@ class PrplmeshTopologyGraph {
 		}
 
 		// Add links based on AP connections
+		// Exclude links between two mesh devices, because sometimes
+		// the mesh links are inconsistent with the AP/STA links.
+		const signalStrengths = {};
 		for (const device of validItems(network.Device)) {
 			for (const radio of validItems(device.Radio)) {
 				for (const bss of validItems(radio.BSS)) {
 					for (const sta of validItems(bss.STA)) {
 						const id = idMap[sta.MACAddress] || sta.MACAddress;
+						// Formula according to 802.11-2016 conversion table (Table 9-154)
+						const signalStrength = sta.SignalStrength > 0 ? (sta.SignalStrength / 2) - 110 : undefined;
+
 						if (!graph.hasNode(id)) {
 							stateInfo.add(`node:${id}:true`);
 							graph.addNode(id, { controller: false, agent: false, enabled: true, macAddress: sta.MACAddress });
+							graph.addLink(idMap[device.ID], id, { signalStrength });
+						} else {
+							// This is a mesh link. Just save the signal strength in case we can use it later.
+							// Sometimes these links are out of sync with the prplmesh topo links, so to avoid confusing
+							// loops do not report these.
+							if (signalStrength) {
+								signalStrengths[`${idMap[device.ID]} - ${id}`] = signalStrengths[`${id} - ${idMap[device.ID]}`] = signalStrength;
+							}
 						}
-
-						graph.addLink(idMap[device.ID], id, {
-							signalStrength: (sta.SignalStrength / 2) - 110, // Formula according to 802.11-2016 conversion table (Table 9-154)
-						});
 					}
 				}
 			}
 		}
 
-		// Add links that don't exist based on mesh topology.
+		// Add mesh topology links (i.e. links between prplmesh agents).
 		for (const device of validItems(network.Device)) {
 			for (const iface of validItems(device.Interface)) {
 				if (!iface.Neighbor) {
@@ -223,10 +233,14 @@ class PrplmeshTopologyGraph {
 				}
 
 				for (const neighbor of Object.values(iface.Neighbor)) {
-					if (!graph.hasLink(idMap[device.ID], idMap[neighbor.ID])) {
-						graph.addLink(idMap[device.ID], idMap[neighbor.ID], {
-							signalStrength: 'unknown',
-						});
+					const neighborID = idMap[neighbor.ID] || neighbor.ID;
+
+					if (!graph.hasNode(neighborID)) {
+						graph.addNode(neighborID, { agent: true, macAddress: neighbor.ID, enabled: true });
+					}
+
+					if (!graph.hasLink(idMap[device.ID], neighborID)) {
+						graph.addLink(idMap[device.ID], neighborID, { signalStrength: signalStrengths[`${idMap[device.ID]} - ${neighborID}`] });
 					}
 				}
 			}
@@ -247,27 +261,27 @@ class PrplmeshTopologyGraph {
 		}
 	}
 
-	renderNode(node) {
+	renderNode(data) {
 		return `
 			<div
 				class="
 					node
-					${node.data.agent ? 'node-agent' : ''}
-					${node.data.controller ? 'node-controller' : ''}
-					${node.data.enabled ? '' : 'node-disabled'}
+					${data.agent ? 'node-agent' : ''}
+					${data.controller ? 'node-controller' : ''}
+					${data.enabled ? '' : 'node-disabled'}
 				"
 				style="
 					width: ${this.nodeWidth - 8}px;
 					height: ${this.nodeHeight - 8}px;
 				"
 				xmlns="http://www.w3.org/1999/xhtml"
-				title="${node.data.enabled ? 'active' : 'offline'}"
+				title="${data.enabled ? 'active' : 'offline'}"
 			>
 				<div>
-				${node.data.model ? `<strong>${node.data.model}</strong><br>` : ''}
-				${this.findRoleDisplay(node.data)} ${node.data.channel ? `(Ch: ${node.data.channel})` : ''}<br>
-				<strong><code>${node.data.macAddress}</code></strong><br>
-				${node.data.backhaulMacAddress ? `<div><small><strong>Backhaul:</strong> <code>${node.data.backhaulMacAddress}</code></small><br>` : ''}
+				${data.model ? `<strong>${data.model}</strong><br>` : ''}
+				${this.findRoleDisplay(data)} ${data.channel ? `(Ch: ${data.channel})` : ''}<br>
+				<strong><code>${data.macAddress}</code></strong><br>
+				${data.backhaulMacAddress ? `<div><small><strong>Backhaul:</strong> <code>${data.backhaulMacAddress}</code></small><br>` : ''}
 				</div>
 			</div>
 		`;
@@ -277,7 +291,9 @@ class PrplmeshTopologyGraph {
 		const graphics = Viva.Graph.View.svgGraphics()
 			.node((node) => {
 				const foreignObject = Viva.Graph.svg('foreignObject').attr('width', this.nodeWidth).attr('height', this.nodeHeight);
-				foreignObject.insertAdjacentHTML('beforeend', this.renderNode(node));
+				// If we somehow accidentally add a link and the node isn't populated, the node will have no data.
+				// This shouldn't happen, but to avoid potential crashes...
+				foreignObject.insertAdjacentHTML('beforeend', this.renderNode(node.data || { enabled: false, macAddress: 'unknown' }));
 				return foreignObject;
 			})
 			.placeNode((nodeUI, pos) => {
@@ -287,7 +303,7 @@ class PrplmeshTopologyGraph {
 			.link((link) => {
 				const titleLine = Viva.Graph.svg('line').attr('stroke-width', 20).attr('stroke', 'black').attr('stroke-opacity', 0);
 				const title = Viva.Graph.svg('title');
-				title.textContent = `RSSI: ${link.data?.signalStrength}dBm`;
+				title.textContent = link.data?.signalStrength ? `RSSI: ${link.data?.signalStrength}dBm` : 'RSSI: unknown';
 				titleLine.append(title);
 				const g = Viva.Graph.svg('g');
 				g.append(Viva.Graph.svg('line').attr('stroke', 'black').attr('stroke-width', 2));
