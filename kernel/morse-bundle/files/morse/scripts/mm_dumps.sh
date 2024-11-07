@@ -175,6 +175,7 @@ s /proc/meminfo
 s /sys/module/morse/parameters
 s /sys/kernel/debug/gpio
 s /sys/fs/pstore
+s /root/.ash_history
 
 # Reading one of these parameters errors out.
 s /sys/kernel/debug/ieee80211/$PHY/morse 2> /dev/null
