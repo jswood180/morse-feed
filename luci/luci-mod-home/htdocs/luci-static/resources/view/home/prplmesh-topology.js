@@ -17,8 +17,8 @@
 'require baseclass';
 'require rpc';
 
-const callDeviceWiFiDataElementsNetworkGet = rpc.declare({
-	object: 'Device.WiFi.DataElements.Network',
+const callDeviceWiFiDataElementsGet = rpc.declare({
+	object: 'Device.WiFi.DataElements',
 	method: '_get',
 	params: ['depth'],
 });
@@ -50,6 +50,9 @@ const PRERENDER_ITERATIONS = 1000;
  *         "MACAddress": "0c:bf:74:68:08:69"
  *     }]}
  * }
+ *
+ * I'm assuming this is particularly insane because they've mapped some TR181
+ * XML data (maybe?) into ubus in a particularly annoying way.
  */
 function unpackDataModel(data) {
 	function unpackKey(d, k, v) {
@@ -171,6 +174,10 @@ class PrplmeshTopologyGraph {
 			}
 		}
 
+		function getID(id) {
+			return idMap[id] || id;
+		}
+
 		// Add devices that are mesh agents.
 		// Construct this before we try to add graph links,
 		// as when we process the radio data we also addNodes
@@ -199,12 +206,14 @@ class PrplmeshTopologyGraph {
 		// Add links based on AP connections
 		// Exclude links between two mesh devices, because sometimes
 		// the mesh links are inconsistent with the AP/STA links.
+		// Unfortunately, currently this only seems to report links on the controller
+		// (though the data structure implies it could be anywhere).
 		const signalStrengths = {};
 		for (const device of validItems(network.Device)) {
 			for (const radio of validItems(device.Radio)) {
 				for (const bss of validItems(radio.BSS)) {
 					for (const sta of validItems(bss.STA)) {
-						const id = idMap[sta.MACAddress] || sta.MACAddress;
+						const id = getID(sta.MACAddress);
 						// Formula according to 802.11-2016 conversion table (Table 9-154)
 						const signalStrength = sta.SignalStrength > 0 ? (sta.SignalStrength / 2) - 110 : undefined;
 
@@ -233,9 +242,10 @@ class PrplmeshTopologyGraph {
 				}
 
 				for (const neighbor of Object.values(iface.Neighbor)) {
-					const neighborID = idMap[neighbor.ID] || neighbor.ID;
+					const neighborID = getID(neighbor.ID);
 
 					if (!graph.hasNode(neighborID)) {
+						stateInfo.add(`node:${neighborID}:true`);
 						graph.addNode(neighborID, { agent: true, macAddress: neighbor.ID, enabled: true });
 					}
 
@@ -243,6 +253,39 @@ class PrplmeshTopologyGraph {
 						graph.addLink(idMap[device.ID], neighborID, { signalStrength: signalStrengths[`${idMap[device.ID]} - ${neighborID}`] });
 					}
 				}
+			}
+		}
+
+		// Currently, it seems the only place STAs connected to other nodes in the mesh
+		// appear is in the association events (and don't have an signal strength).
+		const associations = {};
+		for (const association of validItems(topoData?.Device?.WiFi?.DataElements?.AssociationEvent?.AssociationEventData)) {
+			const id = getID(association.MACAddress);
+			if (!associations[id] || association.TimeStamp > associations[id].TimeStamp) {
+				associations[id] = association;
+			}
+		}
+
+		for (const disassociation of validItems(topoData?.Device?.WiFi?.DataElements?.DisassociationEvent?.DisassociationEventData)) {
+			const id = getID(disassociation.MACAddress);
+			if (associations[id] && associations[id].BSSID === disassociation.BSSID && disassociation.TimeStamp > associations[id].TimeStamp) {
+				associations[id].disabled = true;
+			}
+		}
+
+		for (const [id, association] of Object.entries(associations)) {
+			const bssid = getID(association.BSSID);
+			if (!graph.hasNode(bssid)) {
+				continue;
+			}
+
+			if (!graph.hasNode(id)) {
+				stateInfo.add(`node:${id}:true`);
+				graph.addNode(id, { agent: false, macAddress: association.MACAddress, enabled: !association.disabled });
+			}
+
+			if (!graph.hasLink(bssid, id)) {
+				graph.addLink(bssid, id);
 			}
 		}
 
@@ -264,12 +307,7 @@ class PrplmeshTopologyGraph {
 	renderNode(data) {
 		return `
 			<div
-				class="
-					node
-					${data.agent ? 'node-agent' : ''}
-					${data.controller ? 'node-controller' : ''}
-					${data.enabled ? '' : 'node-disabled'}
-				"
+				class="node ${data.agent ? 'node-agent' : ''} ${data.controller ? 'node-controller' : ''} ${data.enabled ? '' : 'node-disabled'}"
 				style="
 					width: ${this.nodeWidth - 8}px;
 					height: ${this.nodeHeight - 8}px;
@@ -392,7 +430,7 @@ class PrplmeshTopologyData {
 return baseclass.extend({
 	async load() {
 		const [data] = await Promise.all([
-			unpackDataModel(await callDeviceWiFiDataElementsNetworkGet(10)),
+			unpackDataModel(await callDeviceWiFiDataElementsGet(10)),
 			import('./vivagraph.min.js'),
 		]);
 		return new PrplmeshTopologyData(data);
