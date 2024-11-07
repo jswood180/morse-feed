@@ -43,9 +43,31 @@ get_encryption_key() {
         config_foreach find_iface_ap_key wifi-iface $morse_radio
 }
 
-start_dppd() {
+start_service() {
+        get_encryption_key
+        if [ -z "$key" ]; then
+                logger -t $SERVICE -p daemon.crit "No AP on morse device with encryption as SAE"
+                return 1
+        fi
+
+        local ctrl_if_path=''
+        for cpath in /var/run/hostapd_s1g/*; do
+                if [ -S "$cpath" ]; then
+                        if [ -z "$ctrl_if_path" ]; then
+                                ctrl_if_path="$cpath"
+                        else
+                                logger -t $SERVICE -p daemon.warn "Found more than one hostapd control interface in /var/run/hostapd_s1g/*"
+                                break
+                        fi
+                fi
+        done
+        if [ -z "$ctrl_if_path" ]; then
+                logger -t $SERVICE -p daemon.crit "Unable to find hostapd control interface in /var/run/hostapd_s1g"
+                return 1
+        fi
+
         procd_open_instance
-        procd_set_param command dppd --passphrase="$1"
+        procd_set_param command dppd --ctrl-if-path="$ctrl_if_path" --passphrase="$key"
         procd_set_param stdout 1
         procd_set_param stderr 1
         procd_append_param command --http-secrets=/etc/dppd/auth_secrets.txt
@@ -55,15 +77,6 @@ start_dppd() {
         procd_set_param limits as="15000000 15000000"
         procd_set_param respawn 3600 5 50
         procd_close_instance
-}
-
-start_service() {
-        get_encryption_key
-        if [ -z "$key" ]; then
-                logger -t $SERVICE -p daemon.crit "No AP on morse device with encryption as SAE"
-                return 1
-        fi
-        start_dppd $key
 }
 
 
