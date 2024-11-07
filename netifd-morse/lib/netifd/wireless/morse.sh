@@ -145,6 +145,30 @@ build_morse_mod_params(){
 	MOD_PARAMS=`echo $MOD_PARAMS | xargs`
 }
 
+
+# If thinlmac optimisation is unset, the original settings are not restored unless the device is rebooted. 
+# This is because the user could have forced different settings (e.g. via rc.local, or by setting ipv6_disabled=0 
+# in UCI on the network device itself), and we do not want to unexpectedly interfere with these when this option 
+# is unset. Note also that it's difficult to disable IPv6 via UCI in the normal way because it needs to be done 
+# on the L3 device, and this device is not fixed for a particular wifi-iface (i.e. it might be a bridge) so there's 
+# no clean way to push the wifi-device option into the right network device.
+apply_thin_lmac_optimization() {
+	# Disable noise from IPv6 incidental traffic
+	sysctl net.ipv6.conf.all.disable_ipv6=1
+	# Reduce ARP garbage collection frequency
+	sysctl -w net.ipv4.neigh.default.gc_thresh1=2048
+	sysctl -w net.ipv4.neigh.default.gc_thresh2=2048
+	sysctl -w net.ipv4.neigh.default.gc_thresh3=2048
+    # Increase ARP table entry timeout
+    sysctl -w net.ipv4.neigh.default.base_reachable_time_ms=3600000
+    # Disable Unnecessary ARP responses
+    sysctl -w net.ipv4.conf.all.arp_ignore=1
+    sysctl -w net.ipv4.conf.all.arp_announce=2
+	# Increase the number of connections supported per second from 470 - see:
+	# https://stackoverflow.com/questions/410616/increasing-the-maximum-number-of-tcp-ip-connections-in-linux
+	sysctl -w net.ipv4.ip_local_port_range="32768 65535"
+}
+
 drv_morse_cleanup() {
 	hostapd_common_cleanup
 }
@@ -167,6 +191,7 @@ drv_morse_init_device_config() {
 	config_add_array channels
 	config_add_boolean vendor_keep_alive_offload
 	config_add_boolean vfem_4v3
+	config_add_boolean thin_lmac_optimization
 
 	#module parameters
 	config_add_int $MM_MOD_INT
@@ -345,7 +370,8 @@ drv_morse_setup() {
 		ampdu \
 		op_class \
 		vfem_4v3 \
-		bss_color forced_listen_interval
+		bss_color forced_listen_interval \
+		thin_lmac_optimization
 	json_get_values basic_rate_list basic_rate
 	json_select ..
 
@@ -498,6 +524,10 @@ drv_morse_setup() {
 		fi
 
 		morse_cli -i $ifname li $unscaled_interval $scale_factor
+	fi
+
+	if [ "$thin_lmac_optimization" -eq "1" ]; then
+		apply_thin_lmac_optimization
 	fi
 
 	wireless_set_up
