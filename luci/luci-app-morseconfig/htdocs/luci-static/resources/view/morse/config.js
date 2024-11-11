@@ -112,6 +112,7 @@ ${_('If this interface is not the connection to external subnets, you don\'t nee
 
 const BRIDGED_HALOW_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client without WDS bridged with other devices. Either remove the other devices, enable WDS, or remove it from the network.');
 const BRIDGED_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client on the same network as other devices. Either remove the other devices or remove it from the network.');
+const BRIDGED_WIFI_ADHOC_ERROR = _('Network "%s" has an Ad-Hoc Wi-Fi interface on the same network as other devices. Either remove the other devices or remove it from the network.');
 
 // This is based on widgets.NetworkSelect, but uses the zone style colouring
 // rather than the attached devices icons.
@@ -319,10 +320,14 @@ return view.extend({
 	preSaveHook() {
 		// Use a bridge if we have more than one device.
 		for (const network of uci.sections('network', 'interface')) {
-			const bridge = morseuci.useBridgeIfNeeded(network['.name']);
+			const hasBridge = morseuci.useBridgeIfNeeded(network['.name']);
 
-			if (bridge) {
+			if (hasBridge) {
 				for (const wifiIface of morseuci.getNetworkWifiIfaces(network['.name'])) {
+					if (wifiIface.mode === 'adhoc') {
+						throw new TypeError(BRIDGED_WIFI_ADHOC_ERROR.format(network['.name']));
+					}
+
 					if (wifiIface.mode === 'sta' && wifiIface.wds !== '1') {
 						if (this.wifiDevices[wifiIface.device]?.get('type') === 'morse') {
 							throw new TypeError(BRIDGED_HALOW_WIFI_STA_ERROR.format(network['.name']));

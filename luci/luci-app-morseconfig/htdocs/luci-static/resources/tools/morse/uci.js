@@ -262,32 +262,44 @@ function forceBridge(networkSectionId, bridgeName, bridgeMAC = null) {
 	}
 }
 
+/* Check if we should add a bridge for the current network setup or remove a bridge.
+ *
+ * Be conservative: only remove a bridge if we need to, and only add a bridge if we need to.
+ * This reduces the number of changes when interacting with the config page.
+ *
+ * Returns whether there is a bridge.
+ */
 function useBridgeIfNeeded(networkSectionId) {
 	const currentDevice = uci.get('network', networkSectionId, 'device');
 	const bridge = uci.sections('network', 'device').find(s => s.type == 'bridge' && s.name == currentDevice);
 
 	if (bridge) {
-		// Do we need to remove this bridge because our wifi iface can't be bridged? (i.e. it's a sta?)
+		// Do we need to remove this bridge because we have a wifi iface that can't be bridged?
+		// (i.e. it's a sta/adhoc?)
+		// Note that if we have multiple ifaces, we _can't_ safely remove the bridge; instead,
+		// the frontend should fail validation in this situation.
 		if (!hasMultipleDevices(networkSectionId)) {
-			// We're conservative here about removing the bridge: only if necessary.
-			// (i.e. if STA without WDS). This reduces the number of changes when interacting
-			// with the config page.
 			const wifiIfaces = getNetworkWifiIfaces(networkSectionId);
-			if (wifiIfaces.length === 1 && wifiIfaces[0].mode === 'sta' && wifiIfaces[0].wds !== '1') {
-				uci.unset('network', networkSectionId, 'device');
+			// From the above hasMultipleDevices check, there should only be 0 or 1 wifi ifaces.
+			if (wifiIfaces.length === 1) {
+				const iface = wifiIfaces[0];
+
+				if (iface.mode === 'adhoc' || (iface.mode === 'sta' && iface.wds !== '1')) {
+					uci.unset('network', networkSectionId, 'device');
+					return false;
+				}
 			}
-			return false;
-		} else {
-			return true;
 		}
+
+		return true;
 	} else {
-		// Do we need to add a bridge because there are too many potential devices?
+		// Do we need to add a bridge because there are too many devices?
 		if (hasMultipleDevices(networkSectionId)) {
 			setBridgeWithPorts(networkSectionId, currentDevice ? [currentDevice] : []);
 			return true;
-		} else {
-			return false;
 		}
+
+		return false;
 	}
 }
 
