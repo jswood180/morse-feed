@@ -374,6 +374,8 @@ return view.extend({
 		networkMap.chain('dhcp');
 		this.renderNetworkInterfaces(networkMap);
 
+		const easyMesh = uci.get('prplmesh', 'config', 'enable');
+
 		const wirelessMap = new form.Map('wireless', [
 			'Wireless',
 			E('a', {
@@ -392,7 +394,18 @@ return view.extend({
 			}
 
 			this.renderWifiDevice(wirelessMap, device);
-			this.renderWifiInterfaces(wirelessMap, device['.name']);
+			if (device.type === 'morse' && easyMesh == '1') {
+				const alert_message_section = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
+				alert_message_section.anonymous = true;
+				alert_message_section.render = function () {
+					return E('div', { class: 'alert-message warning' }, _(`
+						The following section is read-only in EasyMesh mode. Any direct modifications made on this page might disrupt normal functionality. To make changes, please use the <a target="_blank" href="%s">wizard</a>.
+					`).format(L.url('admin', 'selectwizard')));
+				};
+				this.renderWifiInterfaces(wirelessMap, device['.name'], { readOnly: true });
+			} else {
+				this.renderWifiInterfaces(wirelessMap, device['.name']);
+			}
 		}
 
 		const diagram = E('morse-config-diagram');
@@ -400,7 +413,7 @@ return view.extend({
 		// This is actually a promise, but we can do it along with the render.
 		diagram.updateFrom(uci, ethernetPorts);
 
-		return Promise.all([
+		const elements = [
 			E('div', { class: 'cbi-section' }, [
 				E('h1', 'Quick Configuration'),
 				E('p', _('Use this page to quickly change individual settings. For major changes, we recommend using a Wizard (see menu).')),
@@ -408,7 +421,9 @@ return view.extend({
 			E('div', { class: 'cbi-section' }, diagram),
 			networkMap.render(),
 			wirelessMap.render(),
-		]);
+		];
+
+		return Promise.all(elements);
 	},
 
 	renderWifiDevice(map, device) {
@@ -428,11 +443,16 @@ return view.extend({
 		option = section.option(widgets.WifiFrequencyValue, '_freq', _('Preferred frequency'));
 	},
 
-	renderWifiInterfaces(map, deviceName) {
+	renderWifiInterfaces(map, deviceName, options = {}) {
 		const isMorse = uci.get('wireless', deviceName, 'type') === 'morse';
 		const section = map.section(form.TableSection, 'wifi-iface');
 		section.filter = sectionId => deviceName === uci.get('wireless', sectionId, 'device');
-		section.addremove = true;
+		const readOnly = options.readOnly ? options.readOnly : false;
+		if (readOnly) {
+			section.addremove = false;
+		} else {
+			section.addremove = true;
+		}
 		section.anonymous = true;
 
 		// If we don't immediately set the correct device, it won't appear in our table
@@ -458,6 +478,7 @@ return view.extend({
 		option.enabled = '0';
 		option.disabled = '1';
 		option.default = '0';
+		option.readonly = readOnly;
 
 		option = section.option(form.DummyValue, '_device', _('Device'));
 		option.cfgvalue = (sectionId) => {
@@ -470,6 +491,7 @@ return view.extend({
 				option.value(networkIface['.name'], networkIface['.name']);
 			}
 		}
+		option.readonly = readOnly;
 
 		const MODE_TOOLTIP = _(`
 			Change the mode of your Wi-Fi interface. To enable HaLow Wi-Fi extenders, you should select WDS (Wireless Distribution System)
@@ -479,6 +501,7 @@ return view.extend({
 		for (const [k, v] of Object.entries(isMorse ? HALOW_WIFI_MODE_NAMES : WIFI_MODE_NAMES)) {
 			option.value(k, v);
 		}
+		option.readonly = readOnly;
 		option.onchange = function (ev, sectionId) {
 			this.map.lookupOption('ssid', sectionId)[0].renderUpdate(sectionId);
 			// Clear key on change.
@@ -547,6 +570,7 @@ return view.extend({
 			const DPP_TOOLTIP = _('This enables DPP via QRCode for clients (access points automatically support DPP).');
 			option = section.option(form.Flag, 'dpp', E('span', { 'class': 'show-info', 'data-tooltip': DPP_TOOLTIP }, _('DPP')));
 			option.depends({ '!contains': true, 'mode': 'sta' });
+			option.readonly = readOnly;
 		}
 
 		option = section.option(morseui.SSIDListScan, 'ssid', _('SSID/Mesh ID'));
@@ -554,6 +578,7 @@ return view.extend({
 			option.depends('dpp', '0');
 			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
 		}
+		option.readonly = readOnly;
 		option.datatype = 'and(maxlength(32),minlength(2))';
 		option.write = function (sectionId, value) {
 			const mode = this.map.lookupOption('mode', sectionId)[0].formvalue(sectionId);
@@ -599,6 +624,7 @@ return view.extend({
 		for (const encryptionOption of encryptionOptions) {
 			option.value(encryptionOption, ENCRYPTION_OPTIONS[encryptionOption]);
 		}
+		option.readonly = readOnly;
 		option.default = 'none';
 		option.onchange = function (ev, sectionId, _value) {
 			const keyOption = this.map.lookupOption('_wpa_key', sectionId)[0];
@@ -613,6 +639,7 @@ return view.extend({
 		option.datatype = 'wpakey';
 		option.rmempty = true;
 		option.password = true;
+		option.readonly = readOnly;
 
 		// This curious code is taken from LuCI's wireless.js. Apparently,
 		// in WEP mode key can be an reference specifying key1/key2/key3/key4.

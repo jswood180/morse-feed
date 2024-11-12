@@ -9,6 +9,7 @@
 	--morse-primary-color-low: var(--primary-color-low,  #601489);
 	--morse-primary-color-medium:  var(--primary-color-medium, #7719aa);
 	--morse-primary-color-high: var(--primary-color-high, #901ece);
+	--morse-primary-color-faded: var(--primary-color-faded, #be8dd9);
 	--morse-text-color-low:  var(--text-color-low, hsl(0, 0%, 20%));
  }
 
@@ -61,6 +62,10 @@ input:checked + .morse-slider:before {
 	-webkit-transform: translateX(24px);
 	-ms-transform: translateX(24px);
 	transform: translateX(24px);
+}
+
+input:disabled:checked + .morse-slider {
+    background-color: var(--morse-primary-color-faded);
 }
 
 .morse-slider.round {
