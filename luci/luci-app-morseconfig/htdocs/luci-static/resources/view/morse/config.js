@@ -100,8 +100,23 @@ const ENCRYPTION_MODES_USING_KEYS = new Set([
 	'sae-mixed',
 ]);
 
-const DEFAULT_ENCRYPTION_OPTIONS = ['psk2', 'psk', 'sae', 'wpa3', 'none'];
-const DEFAULT_HALOW_ENCRYPTION_OPTIONS = ['sae', 'owe', 'wpa3', 'none'];
+const ENCRYPTION_OPTIONS_FOR_MODE = {
+	mac80211: {
+		default: ['psk2', 'psk', 'sae', 'wpa3', 'none'],
+		mesh: ['sae', 'none'],
+		adhoc: ['psk2', 'none'],
+		monitor: ['none'],
+		none: ['none'],
+	},
+	morse: {
+		default: ['sae', 'owe', 'wpa3', 'none'],
+		mesh: ['sae', 'none'],
+		adhoc: ['none'],
+		monitor: ['none'],
+		none: ['none'],
+	},
+};
+ENCRYPTION_OPTIONS_FOR_MODE.default = ENCRYPTION_OPTIONS_FOR_MODE.mac80211;
 
 const GATEWAY_DESCRIPTION = `
 <strong>${_('Do I need to set a gateway?')}</strong><br>
@@ -216,6 +231,53 @@ const DynamicDummyValue = form.DummyValue.extend({
 
 	renderUpdate(sectionId) {
 		return form.DummyValue.prototype.renderUpdate.call(this, sectionId, this.cfgvalue(sectionId));
+	},
+});
+
+/* Encryption list that depends on the device type and mode.
+ *
+ * The standard luci encryption selection (in network/wireless):
+ *  - has an overwhelming number of options
+ *  - presents those options even if they'll fail validation
+ *    (e.g. SAE in ad-hoc mode)
+ *
+ * To avoid this, we present only a limited set of options users are likely to choose,
+ * and restrict these based on the device/mode. To handle other options that were set
+ * in the normal luci config, we support setting .existingValues to an array of strings,
+ * and these options are automatically added to the dropdown. This makes sure we don't
+ * accidentally mutate the config due to not being able to represent an existing option.
+ * Where this falls down is if a scan turns up APs that require other modes.
+ *
+ * In order to restrict based on device capabilites, we add .deviceType
+ * (e.g. morse or mac80211). In LuCI's wireless.js, L.hasSystemFeature is used to decide
+ * what encryption options to present. In our case, this is insufficient because
+ * it doesn't know what the available encryptions are for the HaLow specific
+ * hostapd/wpa_supplicant.
+ */
+const WifiEncryptionList = form.ListValue.extend({
+	__name__: 'CBI.WifiEncryptionList',
+
+	renderWidget(sectionId, optionIndex, cfgvalue) {
+		const mode = this.section.formvalue(sectionId, 'mode');
+		const deviceType = Object.keys(ENCRYPTION_OPTIONS_FOR_MODE).includes(this.deviceType) ? this.deviceType : 'default';
+		let encryptionOptions = ENCRYPTION_OPTIONS_FOR_MODE[deviceType][mode];
+		if (!encryptionOptions) {
+			// If no specific encryption options for the mode, use the defaults
+			// (and extend with anything else that's set to avoid accidental mutation).
+			encryptionOptions = Array.from(ENCRYPTION_OPTIONS_FOR_MODE[deviceType].default);
+			for (const val of this.existingValues || []) {
+				if (!encryptionOptions.includes(val)) {
+					encryptionOptions.push(val);
+				}
+			}
+		}
+
+		this.clear();
+		for (const encryptionOption of encryptionOptions) {
+			this.value(encryptionOption, ENCRYPTION_OPTIONS[encryptionOption]);
+		}
+
+		return this.super('renderWidget', [sectionId, optionIndex, cfgvalue]);
 	},
 });
 
@@ -444,7 +506,8 @@ return view.extend({
 	},
 
 	renderWifiInterfaces(map, deviceName, options = {}) {
-		const isMorse = uci.get('wireless', deviceName, 'type') === 'morse';
+		const deviceType = uci.get('wireless', deviceName, 'type');
+		const isMorse = deviceType === 'morse';
 		const section = map.section(form.TableSection, 'wifi-iface');
 		section.filter = sectionId => deviceName === uci.get('wireless', sectionId, 'device');
 		const readOnly = options.readOnly ? options.readOnly : false;
@@ -505,7 +568,9 @@ return view.extend({
 		option.onchange = function (ev, sectionId) {
 			this.map.lookupOption('ssid', sectionId)[0].renderUpdate(sectionId);
 			// Clear key on change.
-			this.section.getUIElement(sectionId, '_wpa_key').setValue('');
+			this.section.getUIElement(sectionId, '_wpa_key')?.setValue('');
+			const encryptionOption = this.map.lookupOption('encryption', sectionId)[0];
+			encryptionOption.renderUpdate(sectionId);
 		};
 		if (!isMorse) {
 			// Since we don't support WDS here, and in advanced config changing
@@ -602,29 +667,22 @@ return view.extend({
 			}
 		};
 
-		// In LuCI's wireless.js, L.hasSystemFeature is used to decide what
-		// encryption options to present. In our case, this is insufficient because
-		// it doesn't know what the available encryptions are for the HaLow specific
-		// hostapd/wpa_supplicant. Moreover, if we present _all_ possible encryptions
-		// it's somewhat overwhelming for the user.
-		// We go for the 'works in most cases' option of presenting the standard
-		// modes + any extras that are currently set. Where this falls down
-		// is if a scan turns up APs that require other modes.
-		option = section.option(form.ListValue, 'encryption', _('Encryption'));
+		option = section.option(WifiEncryptionList, 'encryption', _('Encryption'));
+		option.readonly = readOnly;
 		if (this.hasQRCode && isMorse) {
 			option.depends({ dpp: '0' });
 			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
 		}
-		const encryptionOptions = Array.from(isMorse ? DEFAULT_HALOW_ENCRYPTION_OPTIONS : DEFAULT_ENCRYPTION_OPTIONS);
+		// Let the widget know what existing things are selected
+		// (this allows us to present a limited set in most cases, but if someone
+		// has selected something strange in advanced we can still represent it).
+		option.existingValues = [];
 		for (const wi of uci.sections('wireless', 'wifi-iface')) {
-			if (wi.device === deviceName && wi.encryption && !encryptionOptions.includes(wi.encryption)) {
-				encryptionOptions.push(wi.encryption);
+			if (wi.device === deviceName && wi.encryption && !option.existingValues.includes(wi.encryption)) {
+				option.existingValues.push(wi.encryption);
 			}
 		}
-		for (const encryptionOption of encryptionOptions) {
-			option.value(encryptionOption, ENCRYPTION_OPTIONS[encryptionOption]);
-		}
-		option.readonly = readOnly;
+		option.deviceType = deviceType;
 		option.default = 'none';
 		option.onchange = function (ev, sectionId, _value) {
 			const keyOption = this.map.lookupOption('_wpa_key', sectionId)[0];
