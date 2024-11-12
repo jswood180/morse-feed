@@ -1,9 +1,14 @@
 {
 	"luci-app-rangetest": {
 		"description": "Grant access to the LuCI range test app",
-		"read": {
+		"write": {
 			"ubus": {
-				"morse-mode": [ "query" ]
+				"umdns": [ "update", "browse"]
+			}
+		},
+		"read": {
+			"file": {
+				"/etc/init.d/umdns restart" : [ "exec" ]
 			}
 		}
 	}

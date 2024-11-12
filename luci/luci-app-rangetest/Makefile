@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI Range Testing Tool UI
-LUCI_DEPENDS:=+luci-base
+LUCI_DEPENDS:=+luci-base +umdns
 
 PKG_LICENSE:=Apache-2.0
 

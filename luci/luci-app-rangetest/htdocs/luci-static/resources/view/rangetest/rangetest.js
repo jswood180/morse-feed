@@ -1,9 +1,11 @@
 'use strict';
 
-/* globals view ui form */
+/* globals view ui form rpc fs */
 'require view';
 'require ui';
 'require form';
+'require rpc';
+'require fs';
 
 document.querySelector('head').appendChild(E('link', {
 	rel: 'stylesheet',
@@ -11,9 +13,24 @@ document.querySelector('head').appendChild(E('link', {
 	href: L.resourceCacheBusted('view/rangetest/css/rangetest.css'),
 }));
 
+const umdnsUpdate = rpc.declare({
+	object: 'umdns',
+	method: 'update',
+	params: [],
+});
+
+const umdnsBrowse = rpc.declare({
+	object: 'umdns',
+	method: 'browse',
+	params: ['array'],
+	expect: { '_http._tcp': {} },
+});
+
+const availableRemoteDevices = {};
+
 /* Provide a custom validation function for the GPS coordinate input
 */
-function validateDecimalDegrees(section_id, value) {
+function validateDecimalDegrees(sectionId, value) {
 	if (!value) {
 		return true;
 	}
@@ -60,7 +77,12 @@ return view.extend({
 	async handleStartTest(basicTestConfigurationForm) {
 		try {
 			await basicTestConfigurationForm.parse();
-			ui.addNotification(null, E('p', {}, _('DEBUG: starting test')));
+			const hostname = this.rangetestConfiguration.basic.remoteDeviceHostname;
+			this.rangetestConfiguration.basic.remoteDeviceInfo = availableRemoteDevices[hostname];
+			ui.addNotification(
+				null,
+				E('pre', {}, `DEBUG: starting test\n${JSON.stringify(this.rangetestConfiguration, null, 2)}`),
+			);
 		} catch (e) {
 			ui.addNotification(_('Configuration error'), E('pre', {}, e.message), 'error');
 		}
@@ -79,20 +101,48 @@ return view.extend({
 		const s = m.section(form.NamedSection, 'basic');
 		let o;
 
-		// Extend the select element to also render a discover button
-		const remoteDeviceSelect = s.option(form.ListValue, 'remote', _('Remote Device'), _('The remote device which this test will be conducted against'));
+		const remoteDeviceSelect = s.option(form.ListValue, 'remoteDeviceHostname', _('Remote device'), _('The remote device which this test will be conducted against'));
 		remoteDeviceSelect.readonly = true;
+
+		const updateRemoteDeviceSelectOptions = async (remoteDeviceSelect, sectionId) => {
+			remoteDeviceSelect.clear();
+			// Fully restarting the service clears the cache of old advertisements. TODO: APP-3717.
+			fs.exec_direct('/etc/init.d/umdns', ['restart']);
+			await umdnsUpdate();
+			// Similar issue to above, docs indicate we should "wait a couple of seconds"
+			// after running umdns update. umdns update doesn't seem to wait for us,
+			// instead it returns after sending mdns queries, but before receiving the responses.
+			// Similar cache updating issue to above. TODO: APP-3717.
+			await new Promise(resolveFn => window.setTimeout(resolveFn, 2000));
+			let report = await umdnsBrowse(true);
+
+			if (!report || Object.keys(report).length == 0) {
+				remoteDeviceSelect.readonly = true;
+				remoteDeviceSelect.renderUpdate(sectionId);
+				ui.addNotification(_('Discovery error'), E('pre', {}, _('No compatible remote devices found!')), 'error');
+				return;
+			}
+
+			for (const [hostname, deviceInfo] of Object.entries(report)) {
+				const ipv4 = deviceInfo.ipv4;
+				availableRemoteDevices[hostname] = deviceInfo;
+
+				const optionName = `${hostname} (${ipv4})`;
+				remoteDeviceSelect.value(hostname, optionName);
+			}
+			remoteDeviceSelect.readonly = false;
+			remoteDeviceSelect.renderUpdate(sectionId);
+		};
+
+		// Extend the select element to also render a discover button
 		const renderWidget = remoteDeviceSelect.renderWidget;
-		remoteDeviceSelect.renderWidget = function (section_id, option_index, cfgvalue) {
-			const dropdown = renderWidget.call(this, section_id, option_index, cfgvalue);
+		remoteDeviceSelect.renderWidget = function (sectionId, option_index, cfgvalue) {
+			const dropdown = renderWidget.call(this, sectionId, option_index, cfgvalue);
 			const button = E('button', {
+				id: 'discover-button',
 				class: 'cbi-button cbi-button-action',
 				click: ui.createHandlerFn(this, async () => {
-					await new Promise(resolve => setTimeout(resolve, 1000));
-					remoteDeviceSelect.clear();
-					remoteDeviceSelect.value('TEST', 'test');
-					remoteDeviceSelect.readonly = false;
-					remoteDeviceSelect.renderUpdate(section_id);
+					await updateRemoteDeviceSelectOptions(remoteDeviceSelect, sectionId);
 				}),
 			}, [_('Discover')]);
 			return E('div', { style: 'display: flex; align-items: flex-start; gap: 1em;' }, [
@@ -101,17 +151,17 @@ return view.extend({
 			]);
 		};
 
-		o = s.option(form.Value, 'description', _('Description'), _('An optional, short description of the test conditions'));
+		o = s.option(form.Value, 'description', _('Description'), _('Optional: short description of the test conditions'));
 		o.datatype = 'string';
 		o.placeholder = _('NLOS, elephant in the way...');
 		o.optional = true;
 
-		o = s.option(form.Value, 'local_device_coordinates', _('This Device Position Coordinates'), _('Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
+		o = s.option(form.Value, 'local_device_coordinates', _('Local device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
 		o.validate = validateDecimalDegrees;
 		o.placeholder = '-33.885553, 151.211138';	// MM Sydney office
 		o.optional = true;
 
-		o = s.option(form.Value, 'remote_device_coordinates', _('Remote Device Position Coordinates'), _('Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
+		o = s.option(form.Value, 'remote_device_coordinates', _('Remote device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
 		o.validate = validateDecimalDegrees;
 		o.placeholder = '-34.168550, 150.611910';	// MM Picton office
 		o.optional = true;
@@ -232,38 +282,43 @@ return view.extend({
 			this.renderResultsSummaryTable(),
 		]);
 
-		const res = [
-			E('section', { class: 'cbi-section' }, [
-				E('h2', {}, _('Range Test')),
-				E('div', { class: 'cbi-map-descr' }, _('This is a network utility to perform static range tests.')),
-				E('div', { class: 'cbi-map-descr' }, [
-					E('span', {}, _('How to use:')),
-					E('div', { class: 'cbi-value cbi-message-value' }, [
-						E('ol', {}, [
-							E('li', { style: 'list-style-type: inherit' }, _('Associate this device with another remote device which you want to test against.')),
-							E('li', { style: 'list-style-type: inherit' }, _('Choose that remote device from the dropdown list and select your desired test settings.')),
-							E('li', { style: 'list-style-type: inherit' }, _('Click \'Start Test\' to begin.')),
-						]),
+		const titleSection = E('section', { class: 'cbi-section' }, [
+			E('h2', {}, _('Range Test')),
+			E('div', { class: 'cbi-map-descr' }, _('This is a network utility to perform static range tests.')),
+			E('div', { class: 'cbi-map-descr' }, [
+				E('span', {}, _('How to use:')),
+				E('div', { class: 'cbi-value cbi-message-value' }, [
+					E('ol', {}, [
+						E('li', { style: 'list-style-type: inherit' }, _('Associate this device with another remote device which you want to test against.')),
+						E('li', { style: 'list-style-type: inherit' }, _('Choose that remote device from the dropdown list and select your desired test settings.')),
+						E('li', { style: 'list-style-type: inherit' }, _('Click \'Start Test\' to begin.')),
 					]),
 				]),
 			]),
-			E('section', { class: 'cbi-section' }, [
-				E('h3', {}, [
-					_('Test Configuration'),
-					E('button', {
-						title: 'Advanced Configuration',
-						class: 'icon-button icon-button-settings-cog pull-right',
-						click: ui.createHandlerFn(this, this.renderAdvancedTestConfigurationForm),
-					}),
-				]),
-				basicTestConfigurationForm,
+		]);
+		const configurationSection = E('section', { class: 'cbi-section' }, [
+			E('h3', {}, [
+				_('Test Configuration'),
+				E('button', {
+					title: 'Advanced Configuration',
+					class: 'icon-button icon-button-settings-cog pull-right',
+					click: ui.createHandlerFn(this, this.renderAdvancedTestConfigurationForm),
+				}),
 			]),
-			E('section', { class: 'cbi-section' }, [
-				E('h3', {}, _('Results Summary')),
-				resultsSummaryTable,
-			]),
+			basicTestConfigurationForm,
+		]);
+		const resultsSummarySection = E('section', { class: 'cbi-section' }, [
+			E('h3', {}, _('Results Summary')),
+			resultsSummaryTable,
+		]);
+
+		const res = [
+			titleSection,
+			configurationSection,
+			resultsSummarySection,
 		];
 
+		configurationSection.querySelector('#discover-button').click();
 		return res;
 	},
 });
