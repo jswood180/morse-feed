@@ -108,8 +108,8 @@ return wizard.AbstractWizardView.extend({
 			wlanIp,
 		} = wizard.readSectionInfo();
 
-		morseuci.ensureNetworkExists('lan');
-		morseuci.ensureNetworkExists('ahwlan');
+		morseuci.ensureNetworkExists('lan', { local: true });
+		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
 
 		// Extract values then remove from dummy uci section.
 		const device_mode_meshgate = uci.get('network', 'wizard', 'device_mode_meshgate');
@@ -135,7 +135,6 @@ return wizard.AbstractWizardView.extend({
 			morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
 			uci.set('wireless', morseInterfaceName, 'wds', '1');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isMeshAp) {
 				uci.set('wireless', morseMeshApInterfaceName, 'network', 'ahwlan');
@@ -155,7 +154,6 @@ return wizard.AbstractWizardView.extend({
 		const nonBridgeMode = () => {
 			morseuci.setNetworkDevices('lan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			// Unlike the 'normal' wizard, if we're a mesh gate
 			// NOT bridging ethernet/mesh we still bridge the APs.
@@ -202,7 +200,7 @@ return wizard.AbstractWizardView.extend({
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
-				morseuci.ensureNetworkExists('wifi24lan');
+				morseuci.ensureNetworkExists('wifi24lan', { local: true });
 				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);

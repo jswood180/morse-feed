@@ -137,7 +137,9 @@ return view.extend({
 		uci.set('wireless', morseInterfaceName, 'mode', 'ap');
 		uci.set('wireless', morseInterfaceName, 'wds', '1');
 
-		morseuci.ensureNetworkExists('lan');
+		// lan is the primary local interface unless overridden
+		// by wlan below if the network mode is set to bridged.
+		morseuci.ensureNetworkExists('lan', { local: true, primaryLocal: true });
 		morseuci.setupNetworkWithDnsmasq('lan', morseuci.getFirstIpaddr('lan') || DEFAULT_LAN_IP);
 
 		switch (this.data.wizard.device_mode) {
@@ -203,7 +205,8 @@ return view.extend({
 		const network_mode = this.data.wizard[this.data.wizard.device_mode === 'prplmesh' ? 'network_mode_prplmesh' : 'network_mode'];
 		switch (network_mode) {
 			case 'bridged': // move HaLow and wan to wlan; don't use wan at all
-				morseuci.ensureNetworkExists('wlan');
+				// Override lan with wlan as the primary local network.
+				morseuci.ensureNetworkExists('wlan', { local: true, primaryLocal: true });
 				uci.set('network', 'wlan', 'proto', 'dhcp');
 				morseuci.getOrCreateForwarding('lan', 'wlan');
 

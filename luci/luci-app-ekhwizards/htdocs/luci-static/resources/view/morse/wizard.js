@@ -104,8 +104,8 @@ return wizard.AbstractWizardView.extend({
 			wlanIp,
 		} = wizard.readSectionInfo();
 
-		morseuci.ensureNetworkExists('lan');
-		morseuci.ensureNetworkExists('ahwlan');
+		morseuci.ensureNetworkExists('lan', { local: true });
+		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
 
 		// Extract values then remove from dummy uci section.
 		const device_mode_ap = uci.get('network', 'wizard', 'device_mode_ap');
@@ -127,7 +127,6 @@ return wizard.AbstractWizardView.extend({
 		const bridgeMode = () => {
 			morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isWifiAp) {
 				uci.set('wireless', wifiApInterfaceName, 'network', 'ahwlan');
@@ -141,7 +140,6 @@ return wizard.AbstractWizardView.extend({
 		const nonBridgeMode = () => {
 			morseuci.setNetworkDevices('lan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			if (isWifiAp) {
 				uci.set('wireless', wifiApInterfaceName, 'network', 'lan');
@@ -184,7 +182,7 @@ return wizard.AbstractWizardView.extend({
 				// but the wifi uplink is separate)
 				const iface = bridgeMode();
 
-				morseuci.ensureNetworkExists('wifi24lan');
+				morseuci.ensureNetworkExists('wifi24lan', { local: true });
 				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);

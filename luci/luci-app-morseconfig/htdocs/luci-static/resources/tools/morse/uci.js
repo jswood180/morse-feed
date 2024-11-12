@@ -393,9 +393,33 @@ function setupNetworkWithDnsmasq(sectionId, ip, uplink = true) {
 	}
 }
 
-function ensureNetworkExists(sectionId) {
+/* Ensure that a specified network is fully configured within all relevant UCI sections.
+ *
+ * Always add a new uniquely named network section to the core network configuration
+ * if it doesn't already exist.
+ *
+ * local: Add a 'local' network to specific configurations, similar to OpenWrt's 'lan'.
+ * It is a purely semantic label. At the moment it is just telling umdns to include
+ * the new network in the list of ones which it listens to.
+ *
+ * primaryLocal: Identify the singular primary local network in specific configurations.
+ * It is currently only used to identify the interface for camera-onvif-server.
+ */
+function ensureNetworkExists(sectionId, { local, primaryLocal } = {}) {
 	if (!uci.sections('network', 'interface').find(s => s['.name'] === sectionId)) {
 		uci.add('network', 'interface', sectionId);
+	}
+
+	if (local) {
+		let umdnsNetworkList = uci.get_first('umdns', 'umdns', 'network');
+		if (Array.isArray(umdnsNetworkList) && !umdnsNetworkList.includes(sectionId)) {
+			umdnsNetworkList.push(sectionId);
+			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList);
+		}
+	}
+
+	if (primaryLocal) {
+		uci.set('camera-onvif-server', 'rpicamera', 'interface', sectionId);
 	}
 
 	getOrCreateZone(sectionId);

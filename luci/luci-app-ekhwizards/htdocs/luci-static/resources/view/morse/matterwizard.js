@@ -86,15 +86,14 @@ return wizard.AbstractWizardView.extend({
 			morseInterfaceName,
 			lanIp,
 		} = wizard.readSectionInfo();
-		morseuci.ensureNetworkExists('lan');
-		morseuci.ensureNetworkExists('ahwlan');
+		morseuci.ensureNetworkExists('lan', { local: true });
+		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
 
 		let device_mode_matter = uci.get('network', 'wizard', 'device_mode_matter');
 
 		const bridgeMode = () => {
 			morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			morseuci.useBridgeIfNeeded('ahwlan');
 
@@ -104,7 +103,6 @@ return wizard.AbstractWizardView.extend({
 		const nonBridgeMode = () => {
 			morseuci.setNetworkDevices('lan', this.getEthernetPorts().map(p => p.device));
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
-			uci.set('camera-onvif-server', 'rpicamera', 'interface', 'ahwlan');
 
 			morseuci.useBridgeIfNeeded('lan');
 			morseuci.useBridgeIfNeeded('ahwlan');

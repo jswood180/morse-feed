@@ -709,6 +709,9 @@ const AbstractWizardView = view.extend({
 			// This allows us to switch the broadcast interface for camera-onvif-server
 			// (again, if enabled).
 			uci.load('camera-onvif-server').catch(() => null),
+			// This will enable automated discovery of HaLow devices in applications
+			// such as the range testing UI.
+			uci.load('umdns').catch(() => null),
 			configDiagram.loadTemplate(),
 		]);
 
