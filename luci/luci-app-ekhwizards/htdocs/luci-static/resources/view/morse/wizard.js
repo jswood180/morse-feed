@@ -8,7 +8,7 @@
 'require tools.morse.uci as morseuci';
 'require tools.morse.morseui as morseui';
 
-const DPP_QRCODE_PATH = '/dpp_qrcode.svg';
+const DPP_QRCODE_PATH = `/dpp_qrcode.svg?v=${L.env.sessionid?.slice(10)}`;
 
 return wizard.AbstractWizardView.extend({
 	__init__(/* ... */) {

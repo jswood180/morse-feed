@@ -42,7 +42,7 @@
 'require tools.morse.morseui as morseui';
 'require view.morse.wpsbuttonelement';
 
-const DPP_QRCODE_PATH = '/dpp_qrcode.svg';
+const DPP_QRCODE_PATH = `/dpp_qrcode.svg?v=${L.env.sessionid?.slice(10)}`;
 
 const callLuciDHCPLeases = rpc.declare({
 	object: 'luci-rpc',
