@@ -531,6 +531,7 @@ drv_morse_setup() {
 	fi
 
 	wireless_set_up
+	morse_service_restart
 }
 
 drv_morse_teardown() {
@@ -695,6 +696,29 @@ _find_free_ifname()
 	echo "$prefix$idx"
 }
 
+# These functions exist as we do not have another way to restart or notify
+# services that want to know when the halow interfaces have been restarted.
+# The built in OpenWrt hostapd has ubus hooks that use ubus mechanisms to
+# notify init/procd.
+morse_service_stop() {
+	# squash "not found" messages when services are not installed
+	service smart_manager stop &> /dev/null
+}
+
+morse_service_restart() {
+	#  The service is restarted instead of started for a specific case: If both
+	# wireless and smart_manager have configuration changes, smart_manager may
+	# be reloaded after the morse_service_stop has run but before
+	# morse_service_restart. There is potential for it to come up too early and
+	# communicate with the old hostapd, which is what this function is here to
+	# prevent. We still need to reload smart_manager on smart_manager only
+	# configuration changes, so we don't disable that trigger. This is not
+	# perfect.
+
+	# squash "not found" messages when services are not installed.
+	service smart_manager restart &> /dev/null
+}
+
 morse_setup_ap() {
 	local iface_index=$1
 	json_select config
@@ -838,6 +862,7 @@ morse_vap_cleanup() {
 
 morse_interface_cleanup() {
 	local phy="$1"
+	morse_service_stop
 
 	morse_vap_cleanup hostapd_s1g "$(uci -q -P /var/state get wireless._${phy}.aplist)"
 	morse_vap_cleanup wpa_supplicant_s1g "$(uci -q -P /var/state get wireless._${phy}.splist)"
