@@ -63,7 +63,7 @@ var MorseStats = view.extend({
 		var table = E('table', { class: 'table' }, [
 			E('tr', { class: 'tr table-titles' }, [
 				E('th', { class: 'th' }, _('Log')),
-				E('th', { class: 'th nowrap cbi-section-actions' }, _('Action', 'Prompting the user to take an action')),
+				E('th', { class: 'th nowrap' }, _('Action', 'Prompting the user to take an action')),
 			]),
 		]);
 
