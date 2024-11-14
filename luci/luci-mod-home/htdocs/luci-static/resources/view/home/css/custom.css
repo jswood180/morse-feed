@@ -242,7 +242,7 @@ dd {
 
 @media screen and (width <= 520px) {
 	/* Force password 'input' box to fit by having single column grid */
-	.ap-connect-methods dl > dd > dl {
+	.connect-methods dl > dd > dl {
 		grid-template-columns: 1fr;
 
 		/* let things compress in mobile view, even if they don't want to */
