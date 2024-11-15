@@ -400,6 +400,33 @@ return view.extend({
 				}
 			}
 		}
+
+		// Make sure we don't have too many ifaces for morse devices.
+		// In theory, this should just be obeying the `iw phy` restriction,
+		// but in practice our supported modes are a bit tighter than this so
+		// we check them manually.
+		for (const wd of uci.sections('wireless', 'wifi-device')) {
+			if (wd.disabled === '1' || wd.type !== 'morse') {
+				continue;
+			}
+
+			const modes = [];
+			for (const wi of uci.sections('wireless', 'wifi-iface')) {
+				if (wi.device === wd['.name'] && wi.disabled !== '1' && wi.mode !== 'none') {
+					modes.push(wi.mode);
+				}
+			}
+
+			if (modes.length > 2) {
+				// This is consistent with what iw phy reports as a device capability.
+				throw new TypeError(_('Morse devices can currently have at most two enabled interfaces.'));
+			} else if (modes.length === 2) {
+				modes.sort();
+				if (!(modes[0] === 'ap' && ['mesh', 'sta'].includes(modes[1]))) {
+					throw new TypeError(_('Morse devices with multiple interfaces can only support AP+Mesh or AP+Client.'));
+				}
+			}
+		}
 	},
 
 	load() {
@@ -525,10 +552,9 @@ return view.extend({
 
 			if (!name) {
 				let offset = 1;
-				name = `wifinet${offset}_${deviceName}`;
-				while (uci.get('wireless', name)) {
-					name = 'wifinet' + (++offset);
-				}
+				do {
+					name = `wifinet${offset++}_${deviceName}`;
+				} while (uci.get('wireless', name));
 			}
 			this.map.data.add(config_name, this.sectiontype, name);
 			this.map.data.set(config_name, name, 'device', deviceName);
