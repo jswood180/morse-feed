@@ -1,11 +1,38 @@
+/**
+ * A user-centric range testing application with exportable test output.
+ *
+ * How Remote Calls are Made
+ *
+ * Inspired directly by Arien's luci-lib-morseconfig, the frontend employs a
+ * class called Remote, adapted from his original work. This Remote class extends LuCI.rpc
+ * to manage the login process (including storing the session token, tracking expiry,
+ * and refreshing), handle remote calls, maintain request IDs, and manage general errors.
+ *
+ * The Remote object includes a `call` method, which sends a "layered" RPC request to the local
+ * device's Dongle RPCD plugin. This plugin parses the URI and body arguments to unpack the
+ * desired remote call, creating a POST request to the remote DUT. This setup effectively avoids
+ * CORS issues typically encountered with browser-based requests.
+ *
+ * How Remote Calls are Received
+ *
+ * After experimenting with a custom RPCD plugin to execute iPerf3 and other statistics commands
+ * on the remote device, I found that ucode’s `fs.popen` and `uloop` modules lacked robust
+ * background process management (error handling, output redirection). Instead, the built-in
+ * file RPCD plugin with the exec endpoint efficiently handles arbitrary commands.
+ *
+ * New permissions have been added to `acl.d`; however, creating a dedicated "rangetest" user
+ * with a root-level password but limited access may be a future improvement.
+ */
+
 'use strict';
 
-/* globals view ui form rpc fs */
+/* globals view ui form rpc fs remoteDevice */
 'require view';
 'require ui';
 'require form';
 'require rpc';
 'require fs';
+'require tools.morse.rangetest.remote as remoteDevice';
 
 document.querySelector('head').appendChild(E('link', {
 	rel: 'stylesheet',
@@ -28,8 +55,9 @@ const umdnsBrowse = rpc.declare({
 
 const availableRemoteDevices = {};
 
-/* Provide a custom validation function for the GPS coordinate input
-*/
+/**
+ * Validate GPS or manually entered coordinate input.
+ */
 function validateDecimalDegrees(sectionId, value) {
 	if (!value) {
 		return true;
@@ -58,6 +86,70 @@ function validateDecimalDegrees(sectionId, value) {
 	return true;
 }
 
+async function runRangetest(config) {
+	const {
+		advanced: {
+			logfileDirectory,
+			protocol: protocols,
+			direction: directions,
+		},
+		basic: {
+			remoteDeviceInfo: { ipv4: [remoteIp] },
+			remoteDevicePassword: remotePassword,
+		},
+	} = config;
+
+	let remoteRangetestDevice = remoteDevice.load(remoteIp, remotePassword);
+
+	const testId = Math.random().toString(16).slice(2);
+
+	// Handle ubus specific errors in one place
+	async function executeRemoteCommand(command, params) {
+		const response = await remoteRangetestDevice.remoteRpc.exec(command, params);
+		if (response.code !== 0) {
+			const errorMessage = response.stderr ? response.stderr : 'Unknown error';
+			return Promise.reject(
+				new Error(`Remote ${command} call to ${remoteRangetestDevice.remoteRpc.getBaseURL()} failed with error: ${errorMessage}`),
+			);
+		}
+		return response;
+	}
+
+	async function setupRemoteIperfServer(logfileDirectory, logfileName) {
+		// Create the results directory for the iperf logs on the remote device
+		// in the same directory as they will be collected from locally.
+		const logfilePath = `${logfileDirectory.replace(/\/+$/, '')}/${logfileName.replace(/^\/+/, '')}`;
+		await executeRemoteCommand('/bin/mkdir', ['-p', logfileDirectory]);
+
+		// Take the hammer to any leftover sessions of iperf.
+		try {
+			await executeRemoteCommand('/usr/bin/killall', ['-q', 'iperf3']);
+		} catch (error) {
+			// Returns an error if there were no existing processes to kill.
+		}
+
+		let response = await executeRemoteCommand('/usr/bin/iperf3', ['-s', '-1', '--json', '--logfile', logfilePath, '-D']);
+		return response;
+	}
+
+	try {
+		// TODO: iterate over all protocol and direction combinations
+		const subtestLogfileName = `${testId}_${protocols[0]}_${directions[0]}`;
+
+		// Start remote iperf server (logfile directory is hardcoded in the acl.d)
+		const response = await setupRemoteIperfServer(logfileDirectory, subtestLogfileName);
+
+		// TODO: Run rangetest client with command-poll as per diagnostics.js
+
+		ui.addNotification(
+			null,
+			E('pre', {}, `DEBUG: response from backend\n${JSON.stringify(response, null, 2)}`),
+		);
+	} catch (error) {
+		ui.addNotification(_('Error'), E('pre', {}, `${error.message}`), 'error');
+	}
+}
+
 return view.extend({
 	handleSaveApply: null,
 	handleSave: null,
@@ -69,7 +161,7 @@ return view.extend({
 			advanced: {
 				protocol: ['UDP', 'TCP'],
 				direction: ['Uplink', 'Downlink'],
-				directory: '/tmp/rangetest/data',
+				logfileDirectory: '/tmp/rangetest',
 			},
 		};
 	},
@@ -79,10 +171,9 @@ return view.extend({
 			await basicTestConfigurationForm.parse();
 			const hostname = this.rangetestConfiguration.basic.remoteDeviceHostname;
 			this.rangetestConfiguration.basic.remoteDeviceInfo = availableRemoteDevices[hostname];
-			ui.addNotification(
-				null,
-				E('pre', {}, `DEBUG: starting test\n${JSON.stringify(this.rangetestConfiguration, null, 2)}`),
-			);
+
+			// Uses await to keep the throbber going whilst the test is running.
+			await runRangetest(this.rangetestConfiguration);
 		} catch (e) {
 			ui.addNotification(_('Configuration error'), E('pre', {}, e.message), 'error');
 		}
@@ -151,6 +242,11 @@ return view.extend({
 			]);
 		};
 
+		o = s.option(form.Value, 'remoteDevicePassword', _('Password'), _('Remote device password'));
+		o.datatype = 'string';
+		o.password = true;
+		o.optional = true;
+
 		o = s.option(form.Value, 'description', _('Description'), _('Optional: short description of the test conditions'));
 		o.datatype = 'string';
 		o.placeholder = _('NLOS, elephant in the way...');
@@ -193,10 +289,11 @@ return view.extend({
 		o.value('Uplink', _('Uplink'));
 		o.value('Downlink', _('Downlink'));
 
-		o = s.option(form.Value, 'directory', _('Results Directory'), _('All data inside /tmp/ will be erased on reboot'));
-		o.datatype = 'directory';
-		o.readonly = true;
-		o.placeholder = '/tmp/rangetest';
+		// This requires special validation and will be hardcoded for now
+		// o = s.option(form.Value, 'logfileDirectory', _('Logfile Directory'), _('All data inside /tmp/ will be erased on reboot'));
+		// o.datatype = 'directory';
+		// o.readonly = true;
+		// o.placeholder = '/tmp/rangetest';
 
 		const save = async () => {
 			ui.hideModal();

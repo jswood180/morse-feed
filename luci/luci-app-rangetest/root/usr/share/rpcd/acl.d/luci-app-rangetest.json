@@ -3,7 +3,13 @@
 		"description": "Grant access to the LuCI range test app",
 		"write": {
 			"ubus": {
-				"umdns": [ "update", "browse"]
+				"umdns": [ "update", "browse" ],
+				"rangetest-rpc": [ "request" ]
+			},
+			"file": {
+				"/bin/mkdir -p /tmp/rangetest": [ "exec" ],
+				"/usr/bin/iperf3 -s -1 --json --logfile *": [ "exec" ],
+				"/usr/bin/killall -q iperf3": [ "exec" ]
 			}
 		},
 		"read": {
