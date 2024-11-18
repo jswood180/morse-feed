@@ -191,7 +191,7 @@ function getWifiName(wifiNetwork) {
 		}
 	}
 
-	return wifiNetwork.ubus('dev', 'iwinfo', 'hwmodes_text') ?? _('WiFi');
+	return wifiNetwork.ubus('dev', 'iwinfo', 'hwmodes_text') ?? _('Wi-Fi');
 }
 
 function getL2Devices(netIface) {

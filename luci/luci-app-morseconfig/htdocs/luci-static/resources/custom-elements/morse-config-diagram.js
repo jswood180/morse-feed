@@ -437,9 +437,9 @@ class MorseConfigDiagram extends HTMLElement {
 		slots['STA_MGMT_ETH_LINK'] = _('Ethernet');
 		slots['STA_WIFI24_DEVICE'] = _('Laptop/Device');
 		slots['AP_WIFI24_DEVICE'] = _('Laptop/Device');
-		slots['AP_UPLINK_WIFI24_LINK'] = _('2.4GHz WiFi');
-		slots['AP_WIFI24_LINK'] = _('2.4GHz WiFi');
-		slots['STA_WIFI24_LINK'] = _('2.4GHz WiFi');
+		slots['AP_UPLINK_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
+		slots['AP_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
+		slots['STA_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
 		slots['AP_SELECT_TEXT'] = _('This Device');
 		slots['STA_SELECT_TEXT'] = _('This Device');
 
@@ -612,13 +612,13 @@ class MorseConfigDiagram extends HTMLElement {
 		slots['GATE_MGMT_ETH_DEVICE'] = _('Laptop/Device');
 		slots['GATE_MGMT_ETH_LINK'] = _('Ethernet');
 		slots['GATE_WIFI24_DEVICE'] = _('Laptop/Device');
-		slots['GATE_WIFI24_LINK'] = _('2.4GHz WiFi');
+		slots['GATE_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
 		slots['GATE_SELECT_TEXT'] = _('This Device');
-		slots['GATE_UPLINK_WIFI24_LINK'] = _('2.4GHz WiFi');
+		slots['GATE_UPLINK_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
 		slots['POINT_MGMT_ETH_DEVICE'] = _('Laptop/Device');
 		slots['POINT_MGMT_ETH_LINK'] = _('Ethernet');
 		slots['POINT_WIFI24_DEVICE'] = _('Laptop/Device');
-		slots['POINT_WIFI24_LINK'] = _('2.4GHz WiFi');
+		slots['POINT_WIFI24_LINK'] = _('2.4GHz Wi-Fi');
 		slots['POINT_SELECT_TEXT'] = _('This Device');
 		slots['POINT_DESC'] = _('Mesh Point');
 		slots['OTHER_POINT_DESC'] = _('Mesh Point');

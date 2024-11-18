@@ -439,7 +439,7 @@ msgid "WEP Shared Key"
 msgstr ""
 
 #: luci/luci-mod-home/htdocs/luci-static/resources/view/home/index.js:194
-msgid "WiFi"
+msgid "Wi-Fi"
 msgstr ""
 
 #: luci/luci-mod-home/htdocs/luci-static/resources/view/home/index.js:812

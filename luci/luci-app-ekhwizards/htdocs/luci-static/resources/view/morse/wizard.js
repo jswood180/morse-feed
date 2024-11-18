@@ -13,7 +13,7 @@ const DPP_QRCODE_PATH = `/dpp_qrcode.svg?v=${L.env.sessionid?.slice(10)}`;
 return wizard.AbstractWizardView.extend({
 	__init__(/* ... */) {
 		return this.super('__init__', this.varargs(arguments, 1,
-			_('WiFi HaLow Wizard'),
+			_('Wi-Fi HaLow Wizard'),
 			_(`<p>This wizard will guide you in setting up your device as a simple <b>Client</b> or <b>Access Point</b>.
 				<p>You can exit now if you prefer to complete your configuration manually.</p>`),
 			'morse-config-diagram',

@@ -18,7 +18,7 @@ endef
 define Package/virtual-wire/description
   The virtual-wire package configures the device into a virtual wire mode at
   boot time. The virtual wire mode is a mode where the device acts as a
-  transparent bridge between two physical networks - the ethernet and HaLow WiFi
+  transparent bridge between two physical networks - the ethernet and HaLow Wi-Fi
   networks. The script runs at boot and checks the state of a physical jumper on
   the board and configures the halow device as either an access point or client
   based on the value of the jumper. The region must either be already set in

@@ -38,7 +38,7 @@ return view.extend({
 		const cards = [
 			this.card(
 				L.url('admin', 'morse', 'wizard'),
-				_('Standard WiFi HaLow'),
+				_('Standard Wi-Fi HaLow'),
 				_('Setup your device as a normal Access Point (AP) or Client (Station).'),
 				L.resourceCacheBusted('view/morse/images/wizard.svg'),
 			),
