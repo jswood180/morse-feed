@@ -236,7 +236,20 @@ return wizard.AbstractWizardView.extend({
 		}
 	},
 
-	renderPages() {
+	loadPages() {
+		// resetUci disables all wifi-ifaces, but we want to remember the state of these.
+		const {
+			wifiApInterfaceName,
+			morseMeshApInterfaceName,
+		} = wizard.readSectionInfo();
+
+		return [
+			uci.get('wireless', wifiApInterfaceName, 'disabled') === '1',
+			uci.get('wireless', morseMeshApInterfaceName, 'disabled') === '1',
+		];
+	},
+
+	renderPages([wifiApDisabled, morseMeshApDisabled]) {
 		let page, option;
 
 		const map = this.map;
@@ -252,6 +265,9 @@ return wizard.AbstractWizardView.extend({
 		uci.unset('wireless', morseInterfaceName, 'disabled');
 
 		if (wifiDeviceName) {
+			if (!wifiApDisabled) {
+				uci.unset('wireless', wifiApInterfaceName, 'disabled');
+			}
 			uci.set('wireless', wifiApInterfaceName, 'device', wifiDeviceName);
 			uci.set('wireless', wifiApInterfaceName, 'mode', 'ap');
 
@@ -265,11 +281,16 @@ return wizard.AbstractWizardView.extend({
 		// Create a morse AP config section for mesh gate configuration
 		if (!uci.get('wireless', morseMeshApInterfaceName)) {
 			uci.add('wireless', 'wifi-iface', morseMeshApInterfaceName);
+			uci.set('wireless', morseMeshApInterfaceName, 'disabled', '1');
+			uci.set('wireless', morseMeshApInterfaceName, 'ssid', morseuci.getDefaultSSID());
+			uci.set('wireless', morseMeshApInterfaceName, 'key', morseuci.getDefaultWifiKey());
+		} else if (!morseMeshApDisabled) {
+			uci.unset('wireless', morseMeshApInterfaceName, 'disabled');
 		}
 		uci.set('wireless', morseMeshApInterfaceName, 'device', morseDeviceName);
 		uci.set('wireless', morseMeshApInterfaceName, 'mode', 'ap');
-		uci.set('wireless', morseMeshApInterfaceName, 'disabled', '1');
 
+		const initialMorseMode = uci.get('wireless', morseInterfaceName, 'mode');
 		// Set morseinterface mode to mesh
 		uci.set('wireless', morseInterfaceName, 'mode', 'mesh');
 		// Set interface name to mesh0 as mesh11sd expects mesh iface name to be mesh*
@@ -350,6 +371,7 @@ return wizard.AbstractWizardView.extend({
 		option.onchange = function () {
 			thisWizardView.onchangeOptionUpdateDiagram(this);
 		};
+		option.load = sectionId => uci.get('wireless', sectionId, 'mesh_id') || morseuci.getDefaultSSID();
 
 		option = page.option(form.Value, 'key', _('Mesh Passphrase'));
 		option.datatype = 'wpakey';
@@ -360,6 +382,8 @@ return wizard.AbstractWizardView.extend({
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
+		option.load = sectionId =>
+			(initialMorseMode === 'mesh' && uci.get('wireless', sectionId, 'key')) || morseuci.getDefaultWifiKey();
 
 		option = page.option(widgets.WifiFrequencyValue, '_freq', '<br />' + _('Operating Frequency'));
 		option.ucisection = morseDeviceName;
@@ -501,6 +525,7 @@ return wizard.AbstractWizardView.extend({
 				if (encryptionBySSID[value]) {
 					encryption.getUIElement(sectionId).setValue(encryptionBySSID[value]);
 				}
+				this.section.getUIElement(sectionId, 'uplink_key')?.setValue('');
 			};
 
 			// 2.4 Credentials are one of the few things we don't want to retain,
@@ -560,7 +585,7 @@ return wizard.AbstractWizardView.extend({
 			blacklist: ['GATE_WIFI24', 'POINT_WIFI24'],
 		});
 
-		option = page.option(morseui.Slider, 'disabled', _('Enable Access Point'));
+		option = page.option(morseui.Slider, 'disabled', _('Enable HaLow Access Point'));
 		option.enabled = '0';
 		option.disabled = '1';
 		option.default = '1';
@@ -603,7 +628,7 @@ return wizard.AbstractWizardView.extend({
 				         'POINT_WIFI24_INT_SELECT', 'POINT_WIFI24_INT_SELECT_FILL'],
 			});
 
-			option = page.option(morseui.Slider, 'disabled', _('Enable Access Point'));
+			option = page.option(morseui.Slider, 'disabled', _('Enable 2.4GHz Access Point'));
 			option.enabled = '0';
 			option.disabled = '1';
 			option.default = '0';

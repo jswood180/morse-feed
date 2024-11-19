@@ -728,14 +728,17 @@ const AbstractWizardView = view.extend({
 			configDiagram.loadTemplate(),
 		]);
 
-		const result = await this.loadPages();
+		if (this.configLoadError) {
+			return;
+		}
+
 		try {
+			const result = await this.loadPages();
 			this.loadWizardOptions();
+			return result;
 		} catch (e) {
 			this.configLoadError = e;
 		}
-
-		return result;
 	},
 
 	getExtraConfigFiles() {

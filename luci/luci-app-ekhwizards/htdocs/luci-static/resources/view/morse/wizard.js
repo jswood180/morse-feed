@@ -222,10 +222,14 @@ return wizard.AbstractWizardView.extend({
 
 	async loadPages() {
 		const response = await fetch(DPP_QRCODE_PATH, { method: 'HEAD' });
-		return [response.ok];
+		// resetUci disables all wifi-ifaces, but we want to remember the state of this one.
+		const {
+			wifiApInterfaceName,
+		} = wizard.readSectionInfo();
+		return [response.ok, uci.get('wireless', wifiApInterfaceName, 'disabled') === '1'];
 	},
 
-	renderPages([hasQRCode]) {
+	renderPages([hasQRCode, wifiApDisabled]) {
 		// The general policy here is to make as small a choice as possible on each page.
 		//
 		// Oddly, if you change this.uciconfig this affects the cbid
@@ -248,8 +252,12 @@ return wizard.AbstractWizardView.extend({
 		uci.unset('wireless', morseInterfaceName, 'disabled');
 
 		if (wifiDeviceName) {
+			if (!wifiApDisabled) {
+				uci.unset('wireless', wifiApInterfaceName, 'disabled');
+			}
+
 			uci.set('wireless', wifiApInterfaceName, 'device', wifiDeviceName);
-			uci.set('wireless', wifiStaInterfaceName, 'mode', 'ap');
+			uci.set('wireless', wifiApInterfaceName, 'mode', 'ap');
 
 			if (!uci.get('wireless', wifiStaInterfaceName)) {
 				uci.add('wireless', 'wifi-iface', wifiStaInterfaceName);
@@ -332,6 +340,10 @@ return wizard.AbstractWizardView.extend({
 		option.onchange = function () {
 			thisWizardView.onchangeOptionUpdateDiagram(this);
 		};
+		// Make sure we only load the SSID if we were already an AP; otherwise (or if unset) use default instead.
+		option.load = sectionId =>
+			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'ssid'))
+			|| morseuci.getDefaultSSID();
 
 		option = page.option(form.Value, 'key', _('Passphrase'));
 		option.depends('mode', 'ap');
@@ -339,6 +351,10 @@ return wizard.AbstractWizardView.extend({
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
+		// Make sure we only load the key if we were already an AP; otherwise (or if unset) use default instead.
+		option.load = sectionId =>
+			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'key'))
+			|| morseuci.getDefaultWifiKey();
 
 		option = page.option(widgets.WifiFrequencyValue, '_freq', '<br />' + _('Operating Frequency'));
 		option.depends('mode', 'ap');
@@ -422,9 +438,13 @@ return wizard.AbstractWizardView.extend({
 			}
 		};
 		option.datatype = 'rangelength(1, 32)';
-		option.onchange = function () {
+		option.onchange = function (ev, sectionId, _value) {
 			thisWizardView.onchangeOptionUpdateDiagram(this);
+			// Do not keep key when switching SSID.
+			this.section.getUIElement(sectionId, 'sta_key')?.setValue('');
 		};
+		// Only load SSID if STA mode.
+		option.load = sectionId => uci.get('wireless', sectionId, 'mode') === 'sta' ? uci.get('wireless', sectionId, 'ssid') : '';
 
 		option = page.option(form.Value, 'sta_key', _('Passphrase'));
 		option.depends({ mode: 'sta', dpp: '0' });
@@ -433,6 +453,8 @@ return wizard.AbstractWizardView.extend({
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
+		// Only load the key if STA mode.
+		option.load = sectionId => uci.get('wireless', sectionId, 'mode') === 'sta' ? uci.get('wireless', sectionId, 'key') : '';
 
 		/*****************************************************************************/
 
@@ -570,6 +592,7 @@ return wizard.AbstractWizardView.extend({
 				if (encryptionBySSID[value]) {
 					encryption.getUIElement(sectionId).setValue(encryptionBySSID[value]);
 				}
+				this.section.getUIElement(sectionId, 'uplink_key')?.setValue('');
 			};
 
 			// 2.4 Credentials are one of the few things we don't want to retain,
@@ -631,7 +654,7 @@ return wizard.AbstractWizardView.extend({
 				blacklist: ['MESH_HALOW'],
 			});
 
-			option = page.option(morseui.Slider, 'disabled', _('Enable Access Point'));
+			option = page.option(morseui.Slider, 'disabled', _('Enable 2.4GHz Access Point'));
 			option.enabled = '0';
 			option.disabled = '1';
 			option.default = '0';

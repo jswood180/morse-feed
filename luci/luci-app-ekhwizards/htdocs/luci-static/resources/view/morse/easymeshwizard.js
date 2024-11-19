@@ -24,12 +24,6 @@ return wizard.AbstractWizardView.extend({
 		return ['prplmesh'];
 	},
 
-	async loadPages() {
-		return await Promise.all([
-			network.getDevices(),
-		]);
-	},
-
 	loadWizardOptions() {
 		const {
 			wifiDeviceName,
@@ -248,7 +242,18 @@ return wizard.AbstractWizardView.extend({
 		}
 	},
 
-	renderPages([devices]) {
+	async loadPages() {
+		// resetUci disables all wifi-ifaces, but we want to remember the state of this one.
+		const {
+			wifiApInterfaceName,
+		} = wizard.readSectionInfo();
+		return await Promise.all([
+			network.getDevices(),
+			uci.get('wireless', wifiApInterfaceName, 'disabled') === '1',
+		]);
+	},
+
+	renderPages([devices, wifiApDisabled]) {
 		let page, option;
 
 		this.netDevices = devices;
@@ -264,6 +269,10 @@ return wizard.AbstractWizardView.extend({
 		} = wizard.readSectionInfo();
 
 		if (wifiDeviceName) {
+			if (!wifiApDisabled) {
+				uci.unset('wireless', wifiApInterfaceName, 'disabled');
+			}
+
 			uci.set('wireless', wifiApInterfaceName, 'device', wifiDeviceName);
 			uci.set('wireless', wifiApInterfaceName, 'mode', 'ap');
 
@@ -361,6 +370,10 @@ return wizard.AbstractWizardView.extend({
 		option.onchange = function () {
 			thisWizardView.onchangeOptionUpdateDiagram(this);
 		};
+		// Make sure we only load the SSID if we were already an AP; otherwise (or if unset) use default instead.
+		option.load = sectionId =>
+			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'ssid'))
+			|| morseuci.getDefaultSSID();
 
 		option = page.option(form.Value, 'key', _('Passphrase'));
 		option.depends(`prplmesh.config.master`, '1');
@@ -368,6 +381,10 @@ return wizard.AbstractWizardView.extend({
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
+		// Make sure we only load the key if we were already an AP; otherwise (or if unset) use default instead.
+		option.load = sectionId =>
+			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'key'))
+			|| morseuci.getDefaultWifiKey();
 
 		option = page.option(widgets.WifiFrequencyValue, '_freq', '<br />' + _('Operating Frequency'));
 		option.depends(`prplmesh.config.master`, '1');
@@ -500,6 +517,7 @@ return wizard.AbstractWizardView.extend({
 				if (encryptionBySSID[value]) {
 					encryption.getUIElement(sectionId).setValue(encryptionBySSID[value]);
 				}
+				this.section.getUIElement(sectionId, 'uplink_key')?.setValue('');
 			};
 
 			// 2.4 Credentials are one of the few things we don't want to retain,
@@ -539,7 +557,7 @@ return wizard.AbstractWizardView.extend({
 				extras: ['STA_WIFI24_INT_SELECT', 'STA_WIFI24_INT_SELECT_FILL', 'AP_WIFI24_INT_SELECT', 'AP_WIFI24_INT_SELECT_FILL'],
 			});
 
-			option = page.option(morseui.Slider, 'disabled', _('Enable Access Point'));
+			option = page.option(morseui.Slider, 'disabled', _('Enable 2.4GHz Access Point'));
 			option.enabled = '0';
 			option.disabled = '1';
 			option.default = '0';
