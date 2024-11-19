@@ -41,7 +41,7 @@ return wizard.AbstractWizardView.extend({
 		const getUplink = () => {
 			if (uci.get('wireless', morseInterfaceName, 'mode') !== 'ap' || uci.get('prplmesh', 'config', 'enable') === '1') {
 				return undefined;
-			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
+			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName) && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
 				return 'wifi';
 			} else if (
 				ethInterfaceName === 'lan' && uci.get('wireless', morseInterfaceName, 'network') === 'ahwlan'
