@@ -293,8 +293,6 @@ return wizard.AbstractWizardView.extend({
 		const initialMorseMode = uci.get('wireless', morseInterfaceName, 'mode');
 		// Set morseinterface mode to mesh
 		uci.set('wireless', morseInterfaceName, 'mode', 'mesh');
-		// Set interface name to mesh0 as mesh11sd expects mesh iface name to be mesh*
-		uci.set('wireless', morseInterfaceName, 'ifname', 'mesh0');
 
 		const morseDeviceSection = map.section(form.NamedSection, morseDeviceName, 'wifi-device');
 		const morseMeshInterfaceSection = map.section(form.NamedSection, morseInterfaceName, 'wifi-interface');

@@ -621,25 +621,21 @@ return view.extend({
 					case 'ap-wds':
 						uci.set('wireless', sectionId, 'mode', 'ap');
 						uci.set('wireless', sectionId, 'wds', '1');
-						uci.unset('wireless', sectionId, 'ifname');
 						break;
 
 					case 'sta-wds':
 						uci.set('wireless', sectionId, 'mode', 'sta');
 						uci.set('wireless', sectionId, 'wds', '1');
-						uci.unset('wireless', sectionId, 'ifname');
 						break;
 
 					case 'mesh':
 						uci.set('wireless', sectionId, 'mode', 'mesh');
-						uci.set('wireless', sectionId, 'ifname', 'mesh0');
 						uci.unset('wireless', sectionId, 'wds');
 						break;
 
 					default:
 						uci.set('wireless', sectionId, 'mode', value);
 						uci.unset('wireless', sectionId, 'wds');
-						uci.unset('wireless', sectionId, 'ifname');
 						break;
 				}
 			};

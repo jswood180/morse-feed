@@ -187,9 +187,6 @@ return view.extend({
 				}
 
 				uci.set('wireless', morseMeshInterfaceName, 'mode', 'mesh');
-				// mesh11sd requires a mesh* interface name.
-				uci.set('wireless', morseMeshInterfaceName, 'ifname', 'mesh0');
-				uci.set('system', 'led_halow', 'dev', 'mesh0');
 				uci.set('wireless', morseMeshInterfaceName, 'device', morseDeviceName);
 				uci.set('wireless', morseMeshInterfaceName, 'encryption', 'sae');
 				// Use credentials from AP interface as default if we don't have them.

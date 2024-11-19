@@ -265,8 +265,6 @@ function apply_config (uci, config) {
 		uci.set("wireless", morse_iface, "mesh_id", config.mesh_id);
 		uci.set("wireless", morse_iface, "key", config.key);
 		uci.set("wireless", morse_iface, "encryption", config.encryption);
-		uci.set("wireless", morse_iface, "ifname", "mesh0");
-		uci.set("system", "led_halow", "dev", "mesh0");
 		break;
 	case 'prplmesh':
 		check_config(config, ["country", "channel", "ssid", "key", "encryption"]);

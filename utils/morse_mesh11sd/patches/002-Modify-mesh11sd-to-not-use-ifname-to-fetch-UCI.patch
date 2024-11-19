@@ -1,0 +1,195 @@
+From ceb55a787281024d142c4a4450950e128d731a84 Mon Sep 17 00:00:00 2001
+From: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
+Date: Tue, 19 Nov 2024 14:40:38 +1100
+Subject: [PATCH] Modify mesh11sd to not use ifname to fetch UCI section
+Description: The Mesh11sd daemon expects the mesh interface name to follow the format 'mesh<index>'. 
+ If it doesn't find this format, it attempts to set it in the UCI wireless configuration. 
+ However, this is not an ideal way to deal with interfaces, particularly when interfaces are dynamically named.
+ This patch resolves the issue by removing the setting of the interface name from the script and uses UBUS 
+ calls to map the ifname and the UCI section.
+---
+ src/mesh11sd | 100 ++++++++++++++++++++++++++++++---------------------
+ 1 file changed, 60 insertions(+), 40 deletions(-)
+
+diff --git a/src/mesh11sd b/src/mesh11sd
+index 85041d3..839181f 100755
+--- a/src/mesh11sd
++++ b/src/mesh11sd
+@@ -4,6 +4,9 @@
+ #
+ # mesh11sd daemon
+ #
++
++. /usr/share/libubox/jshn.sh
++
+ version="1.2.0"
+ 
+ get_mesh_iflist () {
+@@ -170,6 +173,43 @@ write_to_syslog() {
+ 	fi
+ }
+ 
++get_mesh_iface_info() {
++	json_select config
++	json_get_var band band
++	json_select ..
++	json_get_keys ifaces interfaces
++	json_select interfaces
++	for iface in $ifaces; do
++		json_select "$iface"
++		json_select config
++		json_get_var mode mode
++		json_select ..
++		if [ "$mode" != "mesh" ]; then
++			json_select ..
++			continue
++		else
++			json_get_var section_name section
++			json_get_var ifname ifname
++			meshconfigs="$meshconfigs $band,$ifname,$section_name"
++			json_select ..
++		fi
++	done
++	json_select ..
++	echo $meshconfigs
++}
++
++get_mesh_configs() {
++	ubus_output=$(ubus call network.wireless status)
++	json_init
++	json_load "$ubus_output"
++	json_get_keys radios
++	for radio in $radios; do
++		json_select $radio
++		meshconfigs=$(get_mesh_iface_info)
++		json_select ..
++	done
++	echo $meshconfigs
++}
+ 
+ ##############
+ # Start point
+@@ -387,45 +427,45 @@ elif [ "$1" = "daemon" ]; then
+ 
+ 		if [ $mode -eq 5 ]; then
+ 			# startup=4, statusmode=0, enabled=1
++			syslogmessage="mesh11sd v$version has started: mesh management mode $mode"
+ 			startup=0
+ 			statusmode=0
+ 			mode=1
+-			syslogmessage="mesh11sd v$version has started: mesh management mode $mode"
+ 
+ 		elif [ $mode -eq 4 ]; then
+ 			# startup=4, statusmode=0, enabled=0
++			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 			startup=0
+ 			statusmode=2
+ 			mode=0
+-			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 
+ 		elif [ $mode -eq 3 ]; then
+ 			# startup=0, statusmode=2, enabled=1
++			syslogmessage="mesh11sd v$version has started: mesh management mode $mode"
+ 			startup=0
+ 			statusmode=0
+ 			mode=1
+-			syslogmessage="mesh11sd v$version has started: mesh management mode $mode"
+ 
+ 		elif [ $mode -eq 2 ]; then
+ 			# startup=0, statusmode=2, enabled=0
++			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 			startup=0
+ 			statusmode=2
+ 			mode=0
+-			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 
+ 		elif [ $mode -eq 1 ]; then
+ 			# startup=0, statusmode=0, enabled=1
++			syslogmessage="mesh11sd v$version has started, mesh management mode $mode"
+ 			startup=0
+ 			statusmode=0
+ 			mode=1
+-			syslogmessage="mesh11sd v$version has started, mesh management mode $mode"
+ 
+ 		elif [ $mode -eq 0 ]; then
+ 			# startup=0, statusmode=0, enabled=0
++			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 			startup=0
+ 			statusmode=2
+ 			mode=0
+-			syslogmessage="mesh11sd v$version has started: mesh status mode $mode"
+ 		fi
+ 
+ 		if [ $mode -ne $lastmode ]; then
+@@ -437,31 +477,12 @@ elif [ "$1" = "daemon" ]; then
+ 		meshindex=0
+ 
+ 		if [ "$enabled" = 1 ]; then
+-			#get list of mesh configs
+-			meshconfigs=$(uci show wireless 2> /dev/null | grep "mode='mesh'" | awk -F ".mode='mesh'" '{printf "%s " $1}')
+-
++			#get list of mesh configs in the following format: band,iface name,uci section name
++			#e.g: s1g,wlan0,wifinet1 2g,wlan1,wifinet2, 2g,wlan2,wifinet3
++			meshconfigs=""
++			meshconfigs=$(get_mesh_configs)
+ 			if [ ! -z "$meshconfigs" ]; then
+-				for meshconfig in $meshconfigs; do
+-					ifname=$(uci get $meshconfig.ifname 2> /dev/null)
+-
+-					if [ -z "$ifname" ] || [ "$ifname" != "mesh$meshindex" ]; then
+-						# No interface name in config, so add one
+-						ucibatch="set $meshconfig.ifname='mesh$meshindex'"
+-						echo "$ucibatch" | uci batch
+-						changed=1
+-						syslogmessage="Setting mesh interface name to [ mesh$meshindex ]"
+-						write_to_syslog
+-					fi
+-					meshindex=$(($meshindex+1))
+-				done
+-
+-				if [ "$changed" -eq 1 ]; then
+-					changed=0
+-					restart_mesh
+-					continue
+-				fi
+-
+-				# get a list of interfaces
++				# get a list of interfaces from iw
+ 				get_mesh_iflist
+ 
+ 				for iface in $iflist; do
+@@ -482,22 +503,21 @@ elif [ "$1" = "daemon" ]; then
+ 						# this is not a mesh interface
+ 						continue
+ 					else
+-						# Check if this interface has a uci ifname
+-						uciname=$(uci show wireless | grep "ifname='$iface'" | awk -F "." '{printf "wireless.%s" $2}')
+-
++						#configure parameters found in wireless config for all bands other than s1g
++						#use mesh11sd config for s1g, because s1g has other properietary mesh config parameters
++						if echo "$meshconfigs" | grep -q "s1g,$iface"; then
++							uciname="mesh11sd.mesh_params"
++						else
++							uciname=$(echo "$meshconfigs" | grep -o "$iface,[^ ]*" | cut -d',' -f2)
++						fi
+ 						if [ -z "$uciname" ]; then
+-							# Error - No interface name in config, we should have added one
++							# Error - No interface with mode as mesh
+ 							debugtype="err"
+-							syslogmessage="Error getting mesh interface name"
++							syslogmessage="Error getting mesh interface section: $meshconfigs"
+ 							write_to_syslog
+ 							continue
+ 						fi
+ 					fi
+-
+-					#configure parameters found in wireless config
+-					check_mesh_params
+-					#override wireless config and/or set parameters found in mesh11sd config
+-					uciname="mesh11sd.mesh_params"
+ 					check_mesh_params
+ 					check_mesh_phantom
+ 				done
+-- 
+2.34.1
+
