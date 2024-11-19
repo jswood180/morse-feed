@@ -49,7 +49,10 @@ return wizard.AbstractWizardView.extend({
 				&& forwardsAhwlanToLan
 			) {
 				return 'ethernet';
-			} else if (ethInterfaceName === uci.get('wireless', morseInterfaceName, 'network')) {
+			} else if (
+				ethInterfaceName === uci.get('wireless', morseInterfaceName, 'network')
+				&& uci.get('network', ethInterfaceName, 'proto') === 'dhcp'
+			) {
 				return 'ethernet';
 			} else {
 				return 'none';
