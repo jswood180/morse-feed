@@ -5,6 +5,9 @@
         "action": {
             "type": "view",
             "path": "morse/morseapwizard"
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -12,6 +15,9 @@
         "action": {
             "type": "alias",
             "path": "admin/morseapwizard"
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     }
 }

@@ -1098,8 +1098,9 @@ return view.extend({
 				leases.push(...Object.values(leasesByHostname));
 				return leases;
 			}),
+			uci.load(['network', 'firewall', 'dhcp', 'luci', 'system']),
+			uci.load('wireless').catch(() => null),
 			uci.load('prplmesh').catch(() => null),
-			uci.load(['wireless', 'network', 'firewall', 'dhcp', 'luci', 'system']),
 			uci.load('mesh11sd').catch(() => null),
 			uci.load('matter').catch(() => null),
 			network.flushCache(true),

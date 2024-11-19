@@ -13,6 +13,9 @@
         "action": {
             "type": "template",
             "path": "morse/selectwizard",
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -20,6 +23,9 @@
         "action": {
             "type": "alias",
             "path": "admin/ekhwizards"
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -28,6 +34,9 @@
         "action": {
             "type": "template",
             "path": "morse/wizard",
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -36,6 +45,9 @@
         "action": {
             "type": "template",
             "path": "morse/meshwizard",
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -44,6 +56,9 @@
         "action": {
             "type": "template",
             "path": "morse/easymeshwizard",
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     },
 
@@ -52,6 +67,9 @@
         "action": {
             "type": "template",
             "path": "morse/matterwizard",
+        },
+        "depends": {
+            "uci": { "wireless": { "@wifi-device": true } }
         }
     }
 }

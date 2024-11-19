@@ -167,6 +167,7 @@
 								<a class="brand" href="#"></a>
 							</div>
 							<div class="status" id="indicators"></div>
+							<% if morse_dev then %>
 							<div class="mode-status">
 								<span data-style="active">
 									<a href="/cgi-bin/luci/admin/selectwizard">
@@ -174,6 +175,7 @@
 									</a>
 								</span>
 							</div>
+							<% end %>
 							<% if found_other_language then %>
 							<div class="languages">
 								<% local first = true %>
@@ -194,7 +196,7 @@
 			<div id="maincontent">
 				<div class="container">
 					<%- if not wizard then %>
-						<%- if not morse_region then -%>
+						<%- if morse_dev and not morse_region then -%>
 							<div class="alert-message warning">
 								<h4><%: Region not set! %></h4>
 								<p><%: There is no region set for your morse interface. Please set your region first. %></p>
@@ -212,7 +214,7 @@
 						<%# We don't solve this properly because we're maintaining some compatibility with morse-theme (for now). %>
 						<span id="password-warning"></span>
 					<%- end -%>
-					<%- if morse_no_otp and not morse_bcf then -%>
+					<%- if morse_dev and morse_no_otp and not morse_bcf then -%>
 						<div id="bcf-warning" class="alert-message warning">
 							<h4><%:BCF may not be appropriate!%></h4>
 							<p><%:The BCF file on this device must be specified via UCI as the board type isn't set in the OTP bits. Currently, your HaLow device is using the non-functional failsafe BCF.%></p>

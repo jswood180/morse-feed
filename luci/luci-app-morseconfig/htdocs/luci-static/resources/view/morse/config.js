@@ -432,23 +432,26 @@ return view.extend({
 	load() {
 		return Promise.all([
 			fetch(DPP_QRCODE_PATH, { method: 'HEAD' }).then(r => r.ok),
-			uci.load('matter').then(() => true).catch(() => false),
-			network.getWifiDevices(),
-			network.getWifiNetworks(),
 			callGetBuiltinEthernetPorts(),
 			configDiagram.loadTemplate(),
-			uci.load(['network', 'wireless', 'firewall', 'dhcp', 'system']),
-			uci.load(['prplmesh']).catch(e => e),
-			uci.load(['mesh11sd']).catch(e => e),
+			uci.load(['network', 'firewall', 'dhcp', 'system']),
+			uci.load('prplmesh').catch(() => null),
+			uci.load('mesh11sd').catch(() => null),
+			uci.load('wireless').catch(() => null),
+			network.flushCache(true),
 		]);
 	},
 
-	async render([hasQRCode, hasMatter, wifiDevices, wifiNetworks, ethernetPorts]) {
+	async render([hasQRCode, ethernetPorts]) {
 		this.hasQRCode = hasQRCode;
 		this.ethernetPorts = ethernetPorts;
-		this.wifiDevices = wifiDevices.reduce((o, d) => (o[d.getName()] = d, o), {});
-		this.wifiNetworks = wifiNetworks.reduce((o, n) => (o[n.getName()] = n, o), {});
-		this.hasMatter = hasMatter;
+		// The actual load is performed by 'flushCache' above; these don't cause network requests.
+		// Note that if we did them in parallel, we would duplicate requests (due to what IMO
+		// is a bug in the initNetworkState caching layer).
+		this.wifiDevices = (await network.getWifiDevices()).reduce((o, d) => (o[d.getName()] = d, o), {});
+		this.wifiNetworks = (await network.getWifiNetworks()).reduce((o, n) => (o[n.getName()] = n, o), {});
+
+		const hasWireless = Object.keys(this.wifiDevices).length > 0;
 
 		const networkMap = new form.Map('network', [
 			_('Network Interfaces'),
@@ -458,47 +461,53 @@ return view.extend({
 				class: 'advanced-config pull-right',
 			}),
 		]);
-		networkMap.chain('wireless');
+		if (hasWireless) {
+			networkMap.chain('wireless');
+		}
 		networkMap.chain('firewall');
 		networkMap.chain('dhcp');
-		this.renderNetworkInterfaces(networkMap);
+		this.renderNetworkInterfaces(networkMap, hasWireless);
 
 		const easyMesh = uci.get('prplmesh', 'config', 'enable');
 
-		const wirelessMap = new form.Map('wireless', [
-			'Wireless',
-			E('a', {
-				href: L.url('admin', 'network', 'wireless'),
-				title: 'Advanced Configuration',
-				class: 'advanced-config pull-right',
-			}),
-		]);
+		let wirelessMap = null;
+		if (hasWireless) {
+			wirelessMap = new form.Map('wireless', [
+				'Wireless',
+				E('a', {
+					href: L.url('admin', 'network', 'wireless'),
+					title: 'Advanced Configuration',
+					class: 'advanced-config pull-right',
+				}),
+			]);
 
-		// Put HaLow devices first
-		const uciWifiDevices = uci.sections('wireless', 'wifi-device').filter(s => s.type === 'morse');
-		uciWifiDevices.push(...uci.sections('wireless', 'wifi-device').filter(s => s.type !== 'morse'));
-		for (const device of uciWifiDevices) {
-			if (device.disabled === '1') {
-				continue;
-			}
+			// Put HaLow devices first
+			const uciWifiDevices = uci.sections('wireless', 'wifi-device').filter(s => s.type === 'morse');
+			uciWifiDevices.push(...uci.sections('wireless', 'wifi-device').filter(s => s.type !== 'morse'));
+			for (const device of uciWifiDevices) {
+				if (device.disabled === '1') {
+					continue;
+				}
 
-			this.renderWifiDevice(wirelessMap, device);
-			if (device.type === 'morse' && easyMesh == '1') {
-				const alert_message_section = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
-				alert_message_section.anonymous = true;
-				alert_message_section.render = function () {
-					return E('div', { class: 'alert-message warning' }, _(`
-						The following section is read-only in EasyMesh mode. Any direct modifications made on this page might disrupt normal functionality. To make changes, please use the <a target="_blank" href="%s">wizard</a>.
-					`).format(L.url('admin', 'selectwizard')));
-				};
-				this.renderWifiInterfaces(wirelessMap, device['.name'], { readOnly: true });
-			} else {
-				this.renderWifiInterfaces(wirelessMap, device['.name']);
+				this.renderWifiDevice(wirelessMap, device);
+				if (device.type === 'morse' && easyMesh == '1') {
+					const alert_message_section = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
+					alert_message_section.anonymous = true;
+					alert_message_section.render = function () {
+						return E('div', { class: 'alert-message warning' }, _(`
+							The following section is read-only in EasyMesh mode. Any direct modifications made on this page might disrupt normal functionality. To make changes, please use the <a target="_blank" href="%s">wizard</a>.
+						`).format(L.url('admin', 'selectwizard')));
+					};
+					this.renderWifiInterfaces(wirelessMap, device['.name'], { readOnly: true });
+				} else {
+					this.renderWifiInterfaces(wirelessMap, device['.name']);
+				}
 			}
 		}
 
 		const diagram = E('morse-config-diagram');
-		this.attachDynamicUpdateHandlers(diagram, ethernetPorts, [networkMap, wirelessMap]);
+		this.attachDynamicUpdateHandlers(diagram, ethernetPorts, hasWireless ? [networkMap, wirelessMap] : [networkMap]);
+
 		// This is actually a promise, but we can do it along with the render.
 		diagram.updateFrom(uci, ethernetPorts);
 
@@ -509,7 +518,7 @@ return view.extend({
 			]),
 			E('div', { class: 'cbi-section' }, diagram),
 			networkMap.render(),
-			wirelessMap.render(),
+			hasWireless ? wirelessMap.render() : [],
 		];
 
 		return Promise.all(elements);
@@ -737,7 +746,7 @@ return view.extend({
 		};
 	},
 
-	renderNetworkInterfaces(map) {
+	renderNetworkInterfaces(map, hasWireless) {
 		const section = map.section(form.TableSection, 'interface');
 		// We set this to anonymous so we can render the name ourselves with colour.
 		section.anonymous = true;
@@ -792,31 +801,33 @@ return view.extend({
 			}
 		};
 
-		option = section.option(DynamicDummyValue, '_wifi_interfaces', _('Wireless'));
-		option.rawhtml = true;
-		option.cfgvalue = (sectionId) => {
-			const wirelessDevices = {};
-			for (const wifiIface of uci.sections('wireless', 'wifi-iface')) {
-				if (wifiIface.disabled !== '1' && wifiIface.network === sectionId) {
-					const deviceName = this.wifiDevices[wifiIface.device]?.getI18n()?.replace(' Wireless Controller', '');
-					const mode = getWifiIfaceModeI18n(wifiIface);
-					const ifname = this.wifiNetworks[wifiIface['.name']]?.getIfname();
-					let tooltip;
-					if (ifname) {
-						tooltip = _('%s (%s) on %s').format(mode, ifname, deviceName);
-					} else {
-						tooltip = _('%s on %s').format(mode, deviceName);
+		if (hasWireless) {
+			option = section.option(DynamicDummyValue, '_wifi_interfaces', _('Wireless'));
+			option.rawhtml = true;
+			option.cfgvalue = (sectionId) => {
+				const wirelessDevices = {};
+				for (const wifiIface of uci.sections('wireless', 'wifi-iface')) {
+					if (wifiIface.disabled !== '1' && wifiIface.network === sectionId) {
+						const deviceName = this.wifiDevices[wifiIface.device]?.getI18n()?.replace(' Wireless Controller', '');
+						const mode = getWifiIfaceModeI18n(wifiIface);
+						const ifname = this.wifiNetworks[wifiIface['.name']]?.getIfname();
+						let tooltip;
+						if (ifname) {
+							tooltip = _('%s (%s) on %s').format(mode, ifname, deviceName);
+						} else {
+							tooltip = _('%s on %s').format(mode, deviceName);
+						}
+						const wifiId = wifiIface.mode === 'mesh' ? `${wifiIface.mesh_id} (mesh)` : wifiIface.ssid;
+						const displayName = wifiIface.dpp === '1' ? '(DPP)' : (wifiId ?? `${wifiIface.device}:${wifiIface.mode}`);
+						(wirelessDevices[displayName] ??= []).push(tooltip);
 					}
-					const wifiId = wifiIface.mode === 'mesh' ? `${wifiIface.mesh_id} (mesh)` : wifiIface.ssid;
-					const displayName = wifiIface.dpp === '1' ? '(DPP)' : (wifiId ?? `${wifiIface.device}:${wifiIface.mode}`);
-					(wirelessDevices[displayName] ??= []).push(tooltip);
 				}
-			}
 
-			return E('div', { style: 'display:flex;flex-wrap:wrap;justify-content:center;' }, Object.entries(wirelessDevices).map(([name, tooltips]) => {
-				return E('span', { 'class': 'show-info', 'data-tooltip': tooltips.join('\n') }, name);
-			}));
-		};
+				return E('div', { style: 'display:flex;flex-wrap:wrap;justify-content:center;' }, Object.entries(wirelessDevices).map(([name, tooltips]) => {
+					return E('span', { 'class': 'show-info', 'data-tooltip': tooltips.join('\n') }, name);
+				}));
+			};
+		}
 
 		option = section.option(form.MultiValue, 'device', _('Ethernet'));
 		option.placeholder = _('None');

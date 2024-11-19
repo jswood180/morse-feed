@@ -55,7 +55,8 @@ return view.extend({
 		return Promise.all([
 			callGetTimezones(),
 			halow.loadChannelMap(),
-			uci.load(['wireless', 'luci']),
+			uci.load('luci'),
+			uci.load('wireless').catch(() => null),
 		]);
 	},
 
