@@ -427,9 +427,6 @@ drv_morse_setup() {
 	local hostapd_conf_file="/var/run/hostapd-$phy.conf"
 	rm -f "$hostapd_conf_file"
 
-	macidx=0
-	used_bridge_macs=""
-
 	wireless_set_data phy="$phy"
 
 	[ -z "$(uci -q -P /var/state show wireless._${phy})" ] && uci -q -P /var/state set wireless._${phy}=phy
@@ -572,7 +569,7 @@ drv_morse_teardown() {
 
 morse_iface_bringup() {
 	json_select config
-	json_get_vars ifname dpp mode ssid wds powersave macaddr enable wpa_psk_file vlan_file
+	json_get_vars ifname mode ssid wds powersave macaddr enable wpa_psk_file vlan_file
 
 	# guard against more than one AP interface
 	if [ -n "$has_ap" -a "$mode" = "ap" ]; then
@@ -601,32 +598,6 @@ morse_iface_bringup() {
 	json_add_string ifname "$ifname"
 	json_add_string phy "$phy"
 
-	# If we're a mesh or sta on a bridge, it's useful for the MAC address of the
-	# wifi-iface to be the same as the MAC address of the bridge so any AP/mesh point
-	# can easily figure out who we are (i.e. map the MAC back to an IP).
-	# Note that if network_ifname exists, this implies it's a bridge
-	# (this actually comes from bridge-ifname in what netifd probides).
-	# But:
-	# - if prplmesh is enabled, it relies on MAC addresses being unique
-	#   keys for its internal topology db.
-	# - if we're trying to pair via DPP, then it's not safe to do this as
-	#   we probably printed it on the box (i.e. it's static, and will
-	#   only work with a particular hardware MAC address).
-	if [ -z "$macaddr" ] && [ -n "$network_ifname" ] && [ "$(uci -q get prplmesh.config.enable)" != 1 ]; then
-		if [ "$mode" = mesh ] || [ "$mode" = sta -a "$wds" = 1 -a "$dpp" != 1 ]; then
-			macaddr=$(cat "/sys/class/net/$network_ifname/address")
-
-			# Make sure we haven't used this already.
-			if [ -n "$macaddr" ]; then
-				if echo "$used_bridge_macs" | grep -q "$macaddr"; then
-					macaddr=''
-				else
-					echo "morse_iface_bringup: forced $ifname to have bridge MAC address: $macaddr"
-					used_bridge_macs="$used_bridge_macs $macaddr"
-				fi
-			fi
-		fi
-	fi
 
 	[ -n "$macaddr" ] || {
 		macaddr="$(morse_generate_mac $phy)"
