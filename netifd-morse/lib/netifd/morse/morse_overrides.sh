@@ -1136,6 +1136,27 @@ morse_override_wpa_supplicant_add_network() {
 		echo "dpp_chirp_forever=1"  >> "$_config"
 
 	else
+		# If we're a normal mesh or sta on a bridge, it's useful for the MAC address
+		# presented by wpa_supplicant to be the same as the MAC address of the bridge
+		# so any AP/mesh point can easily figure out who we are (i.e. map the MAC
+		# address back to an IP). Note that if network_ifname exists, this implies it's
+		# a bridge (this actually comes from bridge-ifname in what netifd provides).
+		#
+		# Exceptions (why this is in an else):
+		# - I don't know what matter does.
+		# - if prplmesh is enabled, it relies on MAC addresses being unique
+		#   keys for its internal topology db.
+		# - if we're trying to pair via DPP, then it's not safe to do this as
+		#   we probably printed it on the box (i.e. it's static, and will
+		#   only work with a particular hardware MAC address). Note that currently
+		#   once DPP is done we switch to a 'normal' configuration, so this won't
+		#   cause any issues.
+		if [ -n "$network_ifname" ]; then
+			# 3 means 'use specified mac_value' (cf 0 is normal, and 1/2 are randomisation strategies)
+			append network_data "mac_addr=3" "$N$T"
+			append network_data "mac_value=$(cat "/sys/class/net/$network_ifname/address")" "$N$T"
+		fi
+
 		wpa_add_network_block "sta" "$_config"
 	fi
 	return 0
