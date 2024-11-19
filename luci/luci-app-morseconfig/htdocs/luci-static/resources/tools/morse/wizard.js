@@ -244,6 +244,26 @@ function whitelistFields(conf, section, whitelist) {
 	}
 }
 
+/**
+ * Remove any leftover disabled wifi ifaces (that aren't the default).
+ *
+ * Users find it confusing when 'extra' interfaces are left around in a disabled
+ * state after running the wizard (in particular with prplmesh). Therefore we
+ * delete them.
+ *
+ * Note this can only be run safely at the end of the wizard, as before this point
+ * it's not clear which interfaces are safe to remove.
+ */
+function removeExtraWifiIfaces() {
+	for (const iface of uci.sections('wireless', 'wifi-iface')) {
+		if (iface.disabled !== '1' || iface['.name'] === `default_${iface.device}`) {
+			continue;
+		}
+
+		uci.unset('wireless', iface['.name']);
+	}
+}
+
 /* When we first load the wizard, we attempt a partial reset of the uci config.
  *
  * However, we only reset what we think we understand, primarily making sure:
@@ -993,6 +1013,8 @@ const AbstractWizardView = view.extend({
 		}
 
 		uci.set('luci', 'wizard', 'used', '1');
+
+		removeExtraWifiIfaces();
 
 		await uci.save();
 	},
