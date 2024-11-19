@@ -348,13 +348,11 @@ function resetUciNetworkTopology() {
 		uci.set('dhcp', dhcp['.name'], 'ignore', '1');
 	}
 
-	const bridgeDevices = new Set();
+	// Remove any bridges; they might cause unexpected devices to be instantiated,
+	// or be carrying confusing names/properties (e.g. br-prpl with forced MAC).
 	for (const device of uci.sections('network', 'device')) {
 		if (device.type === 'bridge') {
-			bridgeDevices.add(device.name);
-			if (device['ports']) {
-				uci.unset('network', device['.name'], 'ports');
-			}
+			uci.remove('network', device['.name']);
 		}
 	}
 
@@ -370,12 +368,7 @@ function resetUciNetworkTopology() {
 		}
 
 		uci.unset('network', iface['.name'], 'gateway');
-		// Leave bridge devices in (their ports are already removed)
-		// so that custom named bridges remain with their networks.
-		// If the bridge is empty, it won't be instantiated.
-		if (!bridgeDevices.has(iface.device)) {
-			uci.unset('network', iface['.name'], 'device');
-		}
+		uci.unset('network', iface['.name'], 'device');
 	}
 }
 
