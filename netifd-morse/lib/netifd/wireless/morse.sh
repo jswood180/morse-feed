@@ -205,6 +205,7 @@ drv_morse_init_iface_config() {
 	config_add_string 'macaddr:macaddr' ifname
 	config_add_boolean wds powersave enable
 	config_add_boolean wps_virtual_push_button
+	config_add_boolean dpp_configurator_connectivity
 	config_add_array sae_group
 	config_add_array owe_group
 	config_add_int maxassoc
@@ -1005,7 +1006,7 @@ morse_hostapd_add_bss(){
 
 	json_select config
 	morse_override_hostapd_set_bss_options hostapd_cfg "$_phy" "$vif" || return 1
-	json_get_vars wds wds_bridge sae_pwe dtim_period max_listen_int start_disabled
+	json_get_vars wds wds_bridge sae_pwe dtim_period max_listen_int start_disabled dpp_configurator_connectivity
 
 
 	raw_block=
@@ -1015,6 +1016,10 @@ morse_hostapd_add_bss(){
 	set_default wds 0
 	set_default start_disabled 0
 	set_default sae_pwe 1
+	# This controls whether DPP is advertised in the beacon. It does _not_ enable DPP,
+	# and hostapd's DPP push button support is available regardless (even if a separate
+	# dpp configurator like morse_dppd is not running).
+	set_default dpp_configurator_connectivity 1
 
 	if [ "$wds" -gt 0 ]; then
 		append hostapd_cfg "wds_sta=1" "$N"
@@ -1029,6 +1034,7 @@ bssid=$_macaddr
 ${dtim_period:+dtim_period=$dtim_period}
 ${max_listen_int:+max_listen_interval=$max_listen_int}
 ${sae_pwe:+sae_pwe=$sae_pwe}
+${dpp_configurator_connectivity:+dpp_configurator_connectivity=$dpp_configurator_connectivity}
 $raw_block
 EOF
 }
