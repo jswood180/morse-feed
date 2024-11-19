@@ -39,7 +39,7 @@ return wizard.AbstractWizardView.extend({
 
 		// If we weren't an AP, force choice again.
 		const getUplink = () => {
-			if (uci.get('wireless', morseInterfaceName, 'mode') !== 'ap') {
+			if (uci.get('wireless', morseInterfaceName, 'mode') !== 'ap' || uci.get('prplmesh', 'config', 'enable') === '1') {
 				return undefined;
 			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
 				return 'wifi';
@@ -68,9 +68,9 @@ return wizard.AbstractWizardView.extend({
 			}
 		};
 
-		// If we weren't a sta, force choice again.
+		// If we weren't a STA, force choice again.
 		const getDeviceModeSta = () => {
-			if (uci.get('wireless', morseInterfaceName, 'mode') !== 'sta') {
+			if (uci.get('wireless', morseInterfaceName, 'mode') !== 'sta' || uci.get('prplmesh', 'config', 'enable') === '1') {
 				return undefined;
 			} else if (ethInterfaceName === 'lan') {
 				return forwardsLanToAhwlan ? 'extender' : 'none';

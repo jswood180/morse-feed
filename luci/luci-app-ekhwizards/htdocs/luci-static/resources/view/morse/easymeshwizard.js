@@ -44,7 +44,7 @@ return wizard.AbstractWizardView.extend({
 
 		// If we weren't a mesh controller, force choice again.
 		const getUplink = () => {
-			if (uci.get('prplmesh', 'config', 'master') !== '1') {
+			if (uci.get('prplmesh', 'config', 'enable') !== '1' || uci.get('prplmesh', 'config', 'master') !== '1') {
 				return undefined;
 			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
 				return 'wifi';
@@ -61,7 +61,7 @@ return wizard.AbstractWizardView.extend({
 
 		// If we weren't a mesh agent, force choice again.
 		const getDeviceModeMeshAgent = () => {
-			if (uci.get('prplmesh', 'config', 'master') !== '0') {
+			if (uci.get('prplmesh', 'config', 'enable') !== '1' || uci.get('prplmesh', 'config', 'master') !== '0') {
 				return undefined;
 			} else if (ethInterfaceName === 'lan') {
 				return forwardsLanToAhwlan ? 'extender' : 'none';
@@ -280,8 +280,12 @@ return wizard.AbstractWizardView.extend({
 		}
 		uci.set('wireless', morseBackhaulStaName, 'device', morseDeviceName);
 
-		// Enable prplmesh
-		uci.set('prplmesh', 'config', 'enable', '1');
+		if (uci.get('prplmesh', 'config', 'enable') !== '1') {
+			// Force user to select prplmesh mode again if we're moving from a non prplmesh mode.
+			uci.unset('prplmesh', 'config', 'master');
+			uci.set('prplmesh', 'config', 'enable', '1');
+		}
+
 		if (!uci.get('prplmesh', morseDeviceName)) {
 			uci.add('prplmesh', 'wifi-device', morseDeviceName);
 		}
