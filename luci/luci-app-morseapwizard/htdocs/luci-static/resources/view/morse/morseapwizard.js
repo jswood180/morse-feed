@@ -303,7 +303,7 @@ return view.extend({
 			callGetBuiltinEthernetPorts(),
 			callMorseModeQuery(),
 			configDiagram.loadTemplate(),
-			uci.load(['network', 'wireless', 'dhcp', 'system', 'firewall', 'prplmesh', 'mesh11sd']),
+			uci.load(['network', 'wireless', 'dhcp', 'system', 'firewall', 'prplmesh', 'mesh11sd', 'umdns']),
 		]);
 
 		if (morseModeInfo.persistent_morse_mode === 'sta') {
