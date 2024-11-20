@@ -260,7 +260,7 @@ function removeExtraWifiIfaces() {
 			continue;
 		}
 
-		uci.unset('wireless', iface['.name']);
+		uci.remove('wireless', iface['.name']);
 	}
 }
 
