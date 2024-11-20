@@ -54,8 +54,14 @@ return wizard.AbstractWizardView.extend({
 				&& uci.get('network', ethInterfaceName, 'proto') === 'dhcp'
 			) {
 				return 'ethernet';
-			} else {
+			} else if (ethInterfaceName !== uci.get('wireless', morseInterfaceName, 'network')) {
+				// They're on separate networks, but not related in a way we expect. Let's make it none.
 				return 'none';
+			} else {
+				// Note that this captures the default OpenWrt, where the AP and ethernet port
+				// are on the same network and there's a DHCP server, but we don't support this mode
+				// in the wizard.
+				return undefined;
 			}
 		};
 
@@ -264,6 +270,11 @@ return wizard.AbstractWizardView.extend({
 			}
 			uci.set('wireless', wifiStaInterfaceName, 'device', wifiDeviceName);
 			uci.set('wireless', wifiStaInterfaceName, 'mode', 'sta');
+		}
+
+		if (uci.get('luci', 'wizard', 'used') !== '1') {
+			// Force user to make this choice again if wizard not used.
+			uci.unset('wireless', morseInterfaceName, 'mode');
 		}
 
 		const morseDeviceSection = map.section(form.NamedSection, morseDeviceName, 'wifi-device');
