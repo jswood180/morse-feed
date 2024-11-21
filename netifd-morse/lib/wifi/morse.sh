@@ -168,7 +168,10 @@ EOF
 			;;
 			morse,ekh01-mf13455)
 				bcf=bcf_mf13455.bin
-	                ;;
+	        ;;
+			morse,ekh01-mf15457)
+				bcf=bcf_mf15457_v2.bin
+			;;
 
 		esac
 
