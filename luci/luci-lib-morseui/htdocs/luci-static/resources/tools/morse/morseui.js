@@ -567,12 +567,12 @@ var UITimeoutModal = function (changes, extraHrefs) {
  * @returns {object} map of ssids to preferred encryption
  */
 async function scanWifi(iface, mode = 'Master', retries = 6) {
-	let scanResult = [];
+	let scanResults = [];
 	for (let i = 0; i < retries; ++i) {
 		try {
-			scanResult = (await callIwinfoScan(iface)).filter(result => result.mode == mode);
+			scanResults = (await callIwinfoScan(iface)).filter(result => result.mode == mode);
 
-			if (scanResult.length > 0) {
+			if (scanResults.length > 0) {
 				break;
 			}
 		} catch (e) {
@@ -583,36 +583,42 @@ async function scanWifi(iface, mode = 'Master', retries = 6) {
 		}
 	}
 
-	function getBestEncryption(enc) {
-		// From wireless.js
-		const is_psk = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
-			return a == 'psk';
-		}).length > 0);
-		const is_sae = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
-			return a == 'sae';
-		}).length > 0);
-
-		if (is_sae) {
-			return 'sae';
-		} else if (is_psk) {
-			if (enc.wpa.includes(2)) {
-				return 'psk2';
-			} else {
-				return 'psk';
-			}
-		} else {
-			return 'none';
-		}
-	}
-
 	const result = {};
-	for (const res of scanResult) {
+	for (const res of scanResults) {
 		if (res['ssid'] && !result[res['ssid']]) {
-			result[res['ssid']] = getBestEncryption(res.encryption);
+			result[res['ssid']] = res;
 		}
 	}
 
 	return result;
+}
+
+/**
+ * Get the best available encryption (from iwinfo scan results).
+ * @param {object} result scan result
+ * @returns {string} best encryption string
+ */
+function getBestEncryption(result) {
+	const enc = result.enc;
+	// From wireless.js
+	const is_psk = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
+		return a == 'psk';
+	}).length > 0);
+	const is_sae = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
+		return a == 'sae';
+	}).length > 0);
+
+	if (is_sae) {
+		return 'sae';
+	} else if (is_psk) {
+		if (enc.wpa.includes(2)) {
+			return 'psk2';
+		} else {
+			return 'psk';
+		}
+	} else {
+		return 'none';
+	}
 }
 
 /* If the adjacent mode is sta, adds a 'scan' button to Value
@@ -627,15 +633,15 @@ var CBISSIDListScan = form.Value.extend({
 	__name__: 'CBI.SSIDWithScan',
 	__init__: function () {
 		this.super('__init__', arguments);
-		this.scanResults = {};
+		this.scanResults = null;
 	},
 
 	onchange(ev, sectionId, value) {
 		if (this.section.formvalue(sectionId, 'mode') === 'sta') {
-			if (this.scanResults[value]) {
+			if (this.scanResults && this.scanResults[value]) {
 				const encryption = this.section.getUIElement(sectionId, 'encryption');
 				if (encryption) {
-					encryption.setValue(this.scanResults[value]);
+					encryption.setValue(getBestEncryption(this.scanResults[value]));
 					// Programmatic change doesn't cause 'change' event for a select, but we may need to
 					// add a 'Key' field after an encryption change.
 					encryption.node.querySelector('select').dispatchEvent(new Event('change'));
@@ -644,14 +650,53 @@ var CBISSIDListScan = form.Value.extend({
 		}
 	},
 
+	renderSSID: function (ssid) {
+		if (!this.scanResults) {
+			return ssid;
+		}
+
+		const res = this.scanResults[ssid];
+		let qualityPercent = -1;
+		if (res && res.quality > 0 && res.quality_max > 0) {
+			qualityPercent = Math.floor((res.quality * 100 / res.quality_max));
+		}
+
+		let icon;
+		if (qualityPercent < 0) {
+			icon = L.resource('icons/signal-none.png');
+		} else if (qualityPercent === 0) {
+			icon = L.resource('icons/signal-0.png');
+		} else if (qualityPercent < 25) {
+			icon = L.resource('icons/signal-0-25.png');
+		} else if (qualityPercent < 50) {
+			icon = L.resource('icons/signal-25-50.png');
+		} else if (qualityPercent < 75) {
+			icon = L.resource('icons/signal-50-75.png');
+		} else {
+			icon = L.resource('icons/signal-75-100.png');
+		}
+
+		return E('div', { style: 'display: flex; align-items: center; justify-content: space-between; width: 100%;' }, [
+			E('span', {}, ssid),
+			E('span', { style: 'flex-grow: 1;' }, ''),
+			res?.signal !== undefined && E('b', { style: 'padding: 0 5px; font-size: 0.7rem;' }, `${res.signal} dBm`),
+			E('img', { src: icon }),
+		].filter(v => v));
+	},
+
 	renderStaWidget: function (sectionId, optionIndex, cfgvalue) {
 		this.clear();
+
 		if (cfgvalue) {
-			this.value(cfgvalue, cfgvalue);
+			this.value(cfgvalue, this.renderSSID(cfgvalue));
 		}
-		for (const ssid of Object.keys(this.scanResults)) {
-			if (ssid !== cfgvalue) {
-				this.value(ssid, ssid);
+
+		const scanResults = Object.values(this.scanResults || {});
+		scanResults.sort((a, b) => (b.quality || 0) - (a.quality || 0));
+
+		for (const res of scanResults) {
+			if (res['ssid'] !== cfgvalue) {
+				this.value(res['ssid'], this.renderSSID(res['ssid']));
 			}
 		}
 
