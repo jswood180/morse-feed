@@ -1,0 +1,213 @@
+#!/usr/bin/ucode -S
+
+/**
+ * Used by the Range Testing application for running background commands.
+ * 
+ * The goal is to eventually move everything into the backend here with 
+ * the frontend range testing UI being as dumb as possible. This is an
+ * interim solution for the sake of time. The frontend will not have to 
+ * do any specific error handling and will only receive a UBUS code if 
+ * errors are encountered.
+ * 
+ * Background commands create process output files in /var/run/rangetest/<id>.
+ * 
+ * API Schema:
+ *  - background_iperf3_server() => { id }
+ *  - background_iperf3_client() => { id, udp, reverse }
+ *  - background_iperf3_result( id ) => json_blob
+ *  - iw_dump( interface ) => { output: ... }
+ *  - morse_cli_stats( interface ) => json_blob
+ *  - morse_cli_stats_reset( interface ) => nothing
+ */
+
+const fs = require('fs');
+const uloop = require('uloop');
+const math = require('math');
+
+const BG_OUTPUT_DIR = '/var/run/rangetest';
+
+/* This is weird because running the iperf3 server
+ * with -s -1 --json will not produce any output
+ * until the end, so assume that no iperf test runs > 5 minutes.
+ */
+const OUTPUT_DIR_TTL = 300;
+
+function get_output_file_paths(id) {
+	return {
+		stdout: `${BG_OUTPUT_DIR}/${id}/stdout`,
+		stderr: `${BG_OUTPUT_DIR}/${id}/stderr`,
+		exit_code: `${BG_OUTPUT_DIR}/${id}/exit_code`,
+	};
+}
+
+/**
+ * Delete a process output directory and all files inside.
+ *
+ * @param id name of the process output directory in /var/run/rangetest
+ * @returns true if success else null if directory inaccesssible
+ */
+function delete_output_directory(id) {
+	const dir = `${BG_OUTPUT_DIR}/${id}`;
+	if (!fs.access(BG_OUTPUT_DIR, 'f') && !fs.access(dir, 'f')) { return false; }
+	const output_file_paths = get_output_file_paths(id);
+	for (file in output_file_paths) {
+		fs.unlink(output_file_paths[file]);
+	}
+	fs.rmdir(dir);
+	return true;
+}
+
+/**
+ * Delete all the process output directories.
+ * 
+ * This is predicated on the rangetest only ever being run one at a time
+ * and should only be called alongside the `killall -q iperf3` commands.
+ */
+function clean_output_directories() {
+	if (!fs.access(BG_OUTPUT_DIR, 'f')) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+
+	const output_directories = fs.lsdir(BG_OUTPUT_DIR);
+	if (!output_directories) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+
+	for (dir in output_directories) { delete_output_directory(dir); }
+}
+
+function execute_background_command(command) {
+	const id = math.rand();
+
+	if (!fs.access(BG_OUTPUT_DIR, 'f') && !fs.mkdir(`${BG_OUTPUT_DIR}`)) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!fs.mkdir(`${BG_OUTPUT_DIR}/${id}`)) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+
+	const output_file_paths = get_output_file_paths(id);
+	for (file in output_file_paths) {
+		const n_bytes_written = fs.writefile(output_file_paths[file], null);
+		if (n_bytes_written == null) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	}
+
+	const stdout_redirect_param = ` 1>${output_file_paths.stdout}`;
+	const stderr_redirect_param = ` 2>${output_file_paths.stderr}`;
+	command += `${stdout_redirect_param} ${stderr_redirect_param}`;
+	const proc = uloop.task((pipe) => {
+		const exit_code = system(command);
+		fs.writefile(output_file_paths.exit_code, exit_code);
+	});
+	if (!proc) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+
+	return { id: id };
+}
+
+function background_iperf3_server(req) {
+	system('killall -q iperf3', 1000);
+	clean_output_directories();
+	const command = 'iperf3 -s -1 --json';
+	return execute_background_command(command);
+}
+
+function background_iperf3_client(req) {
+	const target = req.args.target;
+	const udp = req.args.udp ? '-u' : '';
+	const reverse = req.args.reverse ? '-R' : '';
+	const time = req.args.time;
+	if (time >= OUTPUT_DIR_TTL) { exit(UBUS_STATUS_INVALID_COMMAND); } 
+	if (iptoarr(target) == null) { exit(UBUS_STATUS_INVALID_ARGUMENT); } 
+
+	system('killall -q iperf3', 1000);
+	clean_output_directories();
+	const command = `iperf3 -c ${target} ${udp} ${reverse} -t ${time} --json`;
+	return execute_background_command(command);
+}
+
+function get_background(req) {
+	const id = req.args.id;
+
+	const output_file_paths = get_output_file_paths(id);
+	const output_data = {};
+	for (file in output_file_paths) {
+		if (!fs.access(output_file_paths[file], 'f')) {	exit(UBUS_STATUS_SYSTEM_ERROR); }
+		output_data[file] = fs.readfile(output_file_paths[file]);
+	}
+
+	/* The background iperf is ongoing, there will be no output 
+	 * due to the `--json` flag.
+	 */
+	if (output_data.exit_code == '') {
+		return {};
+	}
+
+	/* The background iperf is complete, there output
+	 * should be json formatted due to the `--json` flag.
+	 */
+	if (output_data.exit_code == '0') { 
+		return json(output_data.stdout);
+	}
+
+	exit(UBUS_STATUS_SYSTEM_ERROR); 
+}
+
+function execute_command(command) {
+	let proc = fs.popen(command);
+	if (!proc) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	const output = proc.read('all');
+	const exit_code = proc.close();
+	if (exit_code != 0) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	return output;
+}
+
+function iw_station_dump(req) {
+	const interface_name = req.args.interface;
+	const output = execute_command(`iw ${interface_name} station dump`);
+	return { output: output };
+}
+
+function morse_cli_stats(req) {
+	const interface_name = req.args.interface;
+	const output = execute_command(`morse_cli -i ${interface_name} stats -j`);
+	return json(output);
+}
+
+function morse_cli_stats_reset(req) {
+	const interface_name = req.args.interface;
+	execute_command(`morse_cli -i ${interface_name} stats -r`);
+	return {};
+}
+
+return {
+	rangetest: {
+		background_iperf3_server: {
+			call: background_iperf3_server,
+		},
+		background_iperf3_client: {
+			call: background_iperf3_client,
+			args: {
+				target: '192.168.1.1',
+				udp: true,
+				reverse: false,
+				time: 10,
+			},
+		},
+		get_background: {
+			call: get_background,
+			args: {
+				id: 123,
+			},
+		},
+		iw_station_dump: {
+			call: iw_station_dump,
+			args: {
+				interface: 'wlan0',
+			},
+		},
+		morse_cli_stats_reset: {
+			call: morse_cli_stats_reset,
+			args: {
+				interface: 'wlan0',
+			},
+		},
+		morse_cli_stats: {
+			call: morse_cli_stats,
+			args: {
+				interface: 'wlan0',
+			},
+		},
+	},
+};

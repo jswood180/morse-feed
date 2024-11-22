@@ -1,38 +1,17 @@
 /**
  * A user-centric range testing application with exportable test output.
- *
- * How Remote Calls are Made
- *
- * Inspired directly by Arien's luci-lib-morseconfig, the frontend employs a
- * class called Remote, adapted from his original work. This Remote class extends LuCI.rpc
- * to manage the login process (including storing the session token, tracking expiry,
- * and refreshing), handle remote calls, maintain request IDs, and manage general errors.
- *
- * The Remote object includes a `call` method, which sends a "layered" RPC request to the local
- * device's Dongle RPCD plugin. This plugin parses the URI and body arguments to unpack the
- * desired remote call, creating a POST request to the remote DUT. This setup effectively avoids
- * CORS issues typically encountered with browser-based requests.
- *
- * How Remote Calls are Received
- *
- * After experimenting with a custom RPCD plugin to execute iPerf3 and other statistics commands
- * on the remote device, I found that ucode’s `fs.popen` and `uloop` modules lacked robust
- * background process management (error handling, output redirection). Instead, the built-in
- * file RPCD plugin with the exec endpoint efficiently handles arbitrary commands.
- *
- * New permissions have been added to `acl.d`; however, creating a dedicated "rangetest" user
- * with a root-level password but limited access may be a future improvement.
  */
 
 'use strict';
 
-/* globals view ui form rpc fs remoteDevice */
+/* globals view ui form rpc fs remoteDevice progressBar */
 'require view';
 'require ui';
 'require form';
 'require rpc';
 'require fs';
 'require tools.morse.rangetest.remote as remoteDevice';
+'require tools.morse.rangetest.progressbar as progressBar';
 
 document.querySelector('head').appendChild(E('link', {
 	rel: 'stylesheet',
@@ -53,7 +32,19 @@ const umdnsBrowse = rpc.declare({
 	expect: { '_http._tcp': {} },
 });
 
-const availableRemoteDevices = {};
+const backgroundIperf3Client = rpc.declare({
+	object: 'rangetest',
+	method: 'background_iperf3_client',
+	params: ['target', 'udp', 'reverse', 'time'],
+});
+
+const getBackground = rpc.declare({
+	object: 'rangetest',
+	method: 'get_background',
+	params: ['id'],
+});
+
+let availableRemoteDevices = {};
 
 /**
  * Validate GPS or manually entered coordinate input.
@@ -86,10 +77,9 @@ function validateDecimalDegrees(sectionId, value) {
 	return true;
 }
 
-async function runRangetest(config) {
+async function runRangetest(cancelPromise, config, testProgressBar) {
 	const {
 		advanced: {
-			logfileDirectory,
 			protocol: protocols,
 			direction: directions,
 		},
@@ -98,56 +88,62 @@ async function runRangetest(config) {
 			remoteDevicePassword: remotePassword,
 		},
 	} = config;
-
 	let remoteRangetestDevice = remoteDevice.load(remoteIp, remotePassword);
 
-	const testId = Math.random().toString(16).slice(2);
+	const iperf3TestTime = 10;
+	const iperf3PollInterval = 2;
 
-	// Handle ubus specific errors in one place
-	async function executeRemoteCommand(command, params) {
-		const response = await remoteRangetestDevice.remoteRpc.exec(command, params);
-		if (response.code !== 0) {
-			const errorMessage = response.stderr ? response.stderr : 'Unknown error';
-			return Promise.reject(
-				new Error(`Remote ${command} call to ${remoteRangetestDevice.remoteRpc.getBaseURL()} failed with error: ${errorMessage}`),
-			);
-		}
-		return response;
-	}
-
-	async function setupRemoteIperfServer(logfileDirectory, logfileName) {
-		// Create the results directory for the iperf logs on the remote device
-		// in the same directory as they will be collected from locally.
-		const logfilePath = `${logfileDirectory.replace(/\/+$/, '')}/${logfileName.replace(/^\/+/, '')}`;
-		await executeRemoteCommand('/bin/mkdir', ['-p', logfileDirectory]);
-
-		// Take the hammer to any leftover sessions of iperf.
-		try {
-			await executeRemoteCommand('/usr/bin/killall', ['-q', 'iperf3']);
-		} catch (error) {
-			// Returns an error if there were no existing processes to kill.
-		}
-
-		let response = await executeRemoteCommand('/usr/bin/iperf3', ['-s', '-1', '--json', '--logfile', logfilePath, '-D']);
-		return response;
-	}
+	const nSubtests = protocols.length * directions.length;
+	const progressIncrement = (iperf3PollInterval / (iperf3TestTime * nSubtests)) * 100;
+	testProgressBar.show();
+	testProgressBar.reset('Beginning...');
 
 	try {
-		// TODO: iterate over all protocol and direction combinations
-		const subtestLogfileName = `${testId}_${protocols[0]}_${directions[0]}`;
+		for (const protocol of protocols) {
+			for (const direction of directions) {
+				testProgressBar.text = `${protocol} ${direction}`;
+				const iperf3ServerResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
+				const iperf3ClientResponse = await backgroundIperf3Client(remoteIp, (protocol.toLowerCase() === 'udp'), (direction.toLowerCase() === 'receive'), iperf3TestTime);
+				const iperf3ClientResults = await waitForIperf3Results(iperf3ClientResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
+				const iperf3ServerResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3ServerResponse.id);
 
-		// Start remote iperf server (logfile directory is hardcoded in the acl.d)
-		const response = await setupRemoteIperfServer(logfileDirectory, subtestLogfileName);
+				console.log(`DEBUG: iperf3 ${protocol} ${direction} client results`, iperf3ClientResults);
+				console.log(`DEBUG: iperf3 ${protocol} ${direction} server results`, iperf3ServerResults);
+			}
+		}
 
-		// TODO: Run rangetest client with command-poll as per diagnostics.js
-
-		ui.addNotification(
-			null,
-			E('pre', {}, `DEBUG: response from backend\n${JSON.stringify(response, null, 2)}`),
-		);
+		testProgressBar.complete('Test Complete');
+		// TODO: save results to file and show in table
 	} catch (error) {
+		testProgressBar.reset('Test Failed');
+		console.error(error);
 		ui.addNotification(_('Error'), E('pre', {}, `${error.message}`), 'error');
 	}
+}
+
+async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, progressIncrement, testProgressBar, cancelPromise) {
+	// 30% margin of safety
+	const timeout = (duration * 1300);
+	const startTime = Date.now();
+	let clientPollResponse, completed = false;
+
+	while (!completed) {
+		if (Date.now() - startTime > timeout) {
+			throw new Error(`Range test client has timed out`);
+		}
+		await new Promise(resolve => setTimeout(resolve, pollInterval * 1000));
+		clientPollResponse = await Promise.race([cancelPromise, getBackground(iperf3ClientId)]);
+		if (clientPollResponse === ui.CANCEL) {
+			testProgressBar.reset('Test Cancelled');
+			throw new Error('Test Cancelled');
+		} else if (Object.keys(clientPollResponse).length > 0) {
+			completed = true;
+		} else {
+			testProgressBar.increment(progressIncrement);
+		}
+	}
+
+	return clientPollResponse;
 }
 
 return view.extend({
@@ -160,22 +156,21 @@ return view.extend({
 			basic: {},
 			advanced: {
 				protocol: ['UDP', 'TCP'],
-				direction: ['Uplink', 'Downlink'],
+				direction: ['Send', 'Receive'],
 				logfileDirectory: '/tmp/rangetest',
 			},
 		};
 	},
 
-	async handleStartTest(basicTestConfigurationForm) {
+	async handleStartTest(ev, cancelPromise, basicTestConfigurationForm) {
 		try {
 			await basicTestConfigurationForm.parse();
 			const hostname = this.rangetestConfiguration.basic.remoteDeviceHostname;
 			this.rangetestConfiguration.basic.remoteDeviceInfo = availableRemoteDevices[hostname];
-
-			// Uses await to keep the throbber going whilst the test is running.
-			await runRangetest(this.rangetestConfiguration);
-		} catch (e) {
-			ui.addNotification(_('Configuration error'), E('pre', {}, e.message), 'error');
+			await runRangetest(cancelPromise, this.rangetestConfiguration, this.testProgressBar);
+		} catch (error) {
+			console.error(error);
+			ui.addNotification(_('Rangetest error'), E('pre', {}, error.message), 'error');
 		}
 	},
 
@@ -268,10 +263,15 @@ return view.extend({
 		o.rmempty = false;
 		o.optional = false;
 
+		let progressBarContainer, progressBarElement;
+		progressBarContainer = E('div', { class: 'cbi-progressbar', style: 'margin: 0 2em 0 2em; visibility: hidden;' }, progressBarElement = E('div', { style: 'width: 0%' }));
+		this.testProgressBar = progressBar.new(progressBarContainer, progressBarElement);
+
 		return E([], [
 			await m.render(),
-			E('div', { class: 'cbi-section-create cbi-tblsection-create' }, [
-				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, this.handleStartTest, m) }, [_('Start Test')]),
+			E('div', { class: 'cbi-page-actions', style: 'display: flex; align-items: center;' }, [
+				E('button', { class: 'cbi-button cbi-button-action', click: ui.createCancellableHandlerFn(this, this.handleStartTest, _('Stop'), m) }, [_('Start Test')]),
+				progressBarContainer,
 			]),
 		]);
 	},
@@ -284,10 +284,14 @@ return view.extend({
 		o = s.option(form.MultiValue, 'protocol', _('Protocol'));
 		o.value('UDP', _('UDP'));
 		o.value('TCP', _('TCP'));
+		o.rmempty = false;
+		o.optional = false;
 
-		o = s.option(form.MultiValue, 'direction', _('Direction'));
-		o.value('Uplink', _('Uplink'));
-		o.value('Downlink', _('Downlink'));
+		o = s.option(form.MultiValue, 'direction', _('Data Direction'));
+		o.value('Send', _('Send'));
+		o.value('Receive', _('Receive'));
+		o.rmempty = false;
+		o.optional = false;
 
 		// This requires special validation and will be hardcoded for now
 		// o = s.option(form.Value, 'logfileDirectory', _('Logfile Directory'), _('All data inside /tmp/ will be erased on reboot'));
@@ -296,8 +300,8 @@ return view.extend({
 		// o.placeholder = '/tmp/rangetest';
 
 		const save = async () => {
+			await m.save();
 			ui.hideModal();
-			ui.addNotification(null, E('p', {}, _('DEBUG: advanced test configuration changes saved!')));
 		};
 
 		ui.showModal(_('Advanced Configuration'), [
@@ -352,11 +356,11 @@ return view.extend({
 		o.datatype = 'uinteger';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'udp_throughput', _('UDP Throughput (Mbps) (Uplink/Downlink)'));
+		o = s.option(form.Value, 'udp_throughput', _('UDP Throughput (Mbps) (Send/Receive)'));
 		o.datatype = 'string';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'tcp_throughput', _('TCP Throughput (Mbps) (Uplink/Downlink)'));
+		o = s.option(form.Value, 'tcp_throughput', _('TCP Throughput (Mbps) (Send/Receive)'));
 		o.datatype = 'string';
 		o.readonly = true;
 

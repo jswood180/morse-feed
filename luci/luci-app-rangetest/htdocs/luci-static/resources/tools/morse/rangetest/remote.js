@@ -5,7 +5,7 @@
 'require rpc';
 
 var remoteRequest = rpc.declare({
-	object: 'rangetest-rpc',
+	object: 'rangetest-remote-rpc',
 	method: 'request',
 	params: ['uri', 'body'],
 });
@@ -41,85 +41,74 @@ var RemoteRpcClass = rpc.constructor.extend({
 		if (this.__currentTime() > this.expires) {
 			return this.__login()
 				.then((response) => {
-					// With certain errors, the response variable is an integer i.e. 2
-					// and the actual http response body is an array [{"jsonrpc":"2.0","id":4,"result":[2]}]
-					if (Number.isInteger(response)) {
-						return this.__handleUbusError(response, `Remote login to ${this.remoteRpcBaseUrl} failed with UBUS error`, true);
-					} else if (response.result && (response.result[0] !== 0 || response.result.length !== 2)) {
-						return this.__handleUbusError(response.result[0], `Remote login to ${this.remoteRpcBaseUrl} failed with UBUS error`, true);
-					}
-
-					this.remoteRpcSessionId = response.result[1].ubus_rpc_session;
-					this.expires = this.__currentTime() + response.result[1].expires;
+					const result = this.__parseCallReply(response, true);
+					this.remoteRpcSessionId = result.ubus_rpc_session;
+					this.expires = this.__currentTime() + result.expires;
 				});
 		}
 		return Promise.resolve();
 	},
 
-	__call: function (req) {
+	__call: async function (method, params) {
 		if (this.remoteRpcBaseUrl === undefined) {
-			return Promise.reject(new Error('No URL set for remote RPC call!'));
+			throw new Error('No URL set for remote RPC call!');
 		}
 
-		return this.__checkLogin()
-			.then(() => {
-				req.params[0] = this.remoteRpcSessionId;
-				req.id = this.remoteRpcRequestId++;
-				return remoteRequest(this.remoteRpcBaseUrl, req);
-			});
-	},
+		await this.__checkLogin();
 
-	__parseCallReply: function (response) {
-		// With incorrect certain errors, the response variable is an integer i.e. 2
-		// and the actual http response body is an array [{"jsonrpc":"2.0","id":4,"result":[2]}]
-		if (Number.isInteger(response)) {
-			return this.__handleUbusError(response, `RPC call to ${this.remoteRpcBaseUrl} failed with UBUS error`);
-		} else if (response.result && (response.result[0] !== 0 || response.result.length !== 2)) {
-			return this.__handleUbusError(response.result[0], `RPC call to ${this.remoteRpcBaseUrl} failed with UBUS error`);
-		}
-
-		// dongle rpcd plugin errors i.e. 404
-		if (response.error || !response.result) {
-			const errorCode = response.error ? response.error.code : 'Unknown';
-			const errorMessage = response.error ? response.error.message : 'Unknown error';
-
-			return Promise.reject(
-				new Error(`RPC call to ${this.remoteRpcBaseUrl} failed with HTTP error: ${errorMessage} (${errorCode})`),
-			);
-		}
-
-		return Promise.resolve(response.result[1]);
-	},
-
-	__handleUbusError: function (code, message, isAuthCheck = false) {
-		if (isAuthCheck && code === 6) {
-			return Promise.reject(new Error('Please try a different password.'));
-		}
-		const ubusErrorMessage = rpc.getStatusText(code) || 'Unknown UBUS error';
-		return Promise.reject(new Error(`${message}: ${ubusErrorMessage}`));
-	},
-
-	/**
-	 * Call the exec endpoint in the file RPCD plugin.
-	 */
-	exec: function (command, params) {
 		const req = {
 			jsonrpc: '2.0',
+			id: 0,
 			method: 'call',
-			params: [
-				null,
-				'file',
-				'exec',
-				{
-					command: command,
-					params: params,
-					timeout: 2,
-				},
-			],
+			params: [this.remoteRpcSessionId, 'rangetest', method, params],
 		};
 
-		return this.__call(req)
-			.then(res => this.__parseCallReply(res));
+		const rpcResponse = await remoteRequest(this.remoteRpcBaseUrl, req);
+		return this.__parseCallReply(rpcResponse);
+	},
+
+	__parseCallReply: function (response, isAuthCheck = false) {
+		// Internal error: if response is a single number it means that
+		// it produced a failure on the internal ubus dispatching object.
+		// Fails on bad URLs, bad endpoints
+		if (Number.isInteger(response)) {
+			const message = rpc.getStatusText(response) || 'Unknown';
+			const errorMessage = isAuthCheck
+				? `Login to ${this.remoteRpcBaseUrl} failed! Check the remote device is online.`
+				: `Request to ${this.remoteRpcBaseUrl} failed with: ${message} (${response})`;
+			throw new Error(errorMessage);
+		}
+
+		// RPC error
+		if (response.error || !response.result) {
+			const returnCode = response.error.code || 'Unknown';
+			const message = response.error.message || 'Unknown';
+			throw new Error(`Request to ${this.remoteRpcBaseUrl} failed with: ${message} (${returnCode})`);
+		}
+
+		// UBUS error
+		if (response.result && Array.isArray(response.result) && response.result.length === 1) {
+			const returnCode = response.result[0];
+			// Certain commands use the 'Command OK' (0) status code
+			if (returnCode === 0) {
+				return response.result[0];
+			}
+			if (isAuthCheck && returnCode === 6) {
+				throw new Error(`Login attempt to ${this.remoteRpcBaseUrl} failed, please try a different password`);
+			}
+			const message = rpc.getStatusText(returnCode) || 'Unknown';
+			throw new Error(`Request to ${this.remoteRpcBaseUrl} failed with: ${message} (${returnCode})`);
+		}
+
+		return response.result[1];
+	},
+
+	backgroundIperf3Server: async function () {
+		return this.__call('background_iperf3_server', {});
+	},
+
+	getBackground: async function (id) {
+		return this.__call('get_background', { id: id });
 	},
 
 	/**
