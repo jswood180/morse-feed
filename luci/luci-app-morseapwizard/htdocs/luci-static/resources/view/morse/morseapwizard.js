@@ -196,6 +196,7 @@ return view.extend({
 				if (!uci.get('wireless', morseMeshInterfaceName, 'key')) {
 					uci.set('wireless', morseMeshInterfaceName, 'key', uci.get('wireless', morseInterfaceName, 'key'));
 				}
+				uci.set('system', 'led_halow', 'dev', 'wlan0');
 				break;
 		}
 
