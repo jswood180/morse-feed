@@ -445,9 +445,10 @@ drv_morse_setup() {
 	has_sta=
 	has_mesh=
 	has_adhoc=
+	has_monitor=
 
 	#bring the interfaces up
-	for_each_interface "ap sta adhoc mesh none" morse_iface_bringup
+	for_each_interface "ap sta adhoc mesh none monitor" morse_iface_bringup
 
 	# setup the 11ah specific regulatory translation
 	# and setup the general s1g device defaults as common configs for all interfaces
@@ -482,6 +483,13 @@ drv_morse_setup() {
 
 	}
 	for_each_interface "adhoc" morse_setup_adhoc
+
+	[ -n "$has_monitor" ] && {
+		json_select config
+		json_get_vars op_class channel country s1g_prim_chwidth s1g_prim_1mhz_chan_index
+		json_select ..
+	}
+	for_each_interface "monitor" morse_setup_monitor
 
 	# Ideally, this would also be in the hostapd/wpa_supplicant config,
 	# but for now they don't have support so we use morse_cli.
@@ -591,6 +599,13 @@ morse_iface_bringup() {
 		return
 	fi
 
+	# guard against more than one monitor interface
+	if [ -n "$has_monitor" ] && [ "$mode" = "monitor" ]; then
+		echo "Can't have more than one monitor interface."
+		json_select ..
+		return
+	fi
+
 	set_default wds 0
 
 	[ -z "$ifname" ] && ifname="$(_find_free_ifname wlan)"
@@ -645,6 +660,14 @@ morse_iface_bringup() {
 		adhoc)
 			has_adhoc=1
 			morse_iw_interface_add "$phy" "$ifname" adhoc
+		;;
+
+		monitor)
+			morse_iw_interface_add "$phy" "$ifname" monitor
+			ip link set "$ifname" up
+			#we need morse0 to dump the packets from.
+			ip link set morse0 up
+			has_monitor=1
 		;;
 
 		*)
@@ -821,6 +844,23 @@ morse_setup_adhoc() {
 	uci -q -P /var/state set wireless._${phy}.umlist="${ifname}"
 }
 
+morse_setup_monitor() {
+	local iface_index=$1
+    halow_bw=
+	center_freq=
+    _get_regulatory NA "$country" "$channel" "$op_class"
+    if [ $? -ne 0 ]; then
+        echo "Couldn't find reg for NA in $country with ch=$channel op=$op_class" >&2
+        return
+    fi
+    #multiply the center_freq by 1000 and remove the decimal part
+    center_freq=$(echo "$center_freq * 1000" | bc | awk '{printf "%g\n", $0}')
+    morse_cli -i $ifname channel -c $center_freq ${halow_bw:+-o $halow_bw} ${s1g_prim_chwidth:+-p $(( s1g_prim_chwidth + 1 ))} ${s1g_prim_1mhz_chan_index:+-n $s1g_prim_1mhz_chan_index}
+
+	[ -n "$failed" ] || wireless_add_vif "$iface_index" "$ifname"
+	uci -q -P /var/state set wireless._${phy}.umlist="${ifname}"
+}
+
 morse_vap_cleanup() {
 	local service="$1"
 	local vaps="$2"
@@ -828,6 +868,9 @@ morse_vap_cleanup() {
 	for wdev in $vaps; do
 		[ "$service" != "none" ] && kill_wait $service &> /dev/null
 		ip link set dev "$wdev" down 2>/dev/null
+		#for monitor mode, we needed to bring up the morse0 interface,
+		#so if we are removing a (the) monitor interface, bring down morse0
+		[ -n "$(iw dev $wdev info | grep "type monitor")" ] && ip link set dev morse0 down
 		iw dev "$wdev" del 2>/dev/null
 	done
 }
