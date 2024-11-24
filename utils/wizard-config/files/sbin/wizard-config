@@ -252,7 +252,7 @@ function apply_config (uci, config) {
 		uci.set("wireless", morse_iface, "mode", "sta");
 		// Disable powersave since this is only used for Extenders where
 		// power is not a concern (powersave causes higher latency).
-		uci.set("wireless", morse_iface, "powersave", "0")
+		uci.set("wireless", morse_iface, "powersave", "0");
 		uci.set("wireless", morse_iface, "ssid", config.ssid);
 		uci.set("wireless", morse_iface, "key", config.key);
 		uci.set("wireless", morse_iface, "encryption", config.encryption);
@@ -293,7 +293,7 @@ function apply_config (uci, config) {
 		uci.set("wireless", backhaul_sta, "mode", "sta");
 		// Disable powersave since this is only used for Extenders where
 		// power is not a concern (powersave causes higher latency).
-		uci.set("wireless", backhaul_sta, "powersave", "0")
+		uci.set("wireless", backhaul_sta, "powersave", "0");
 		uci.set("wireless", backhaul_sta, "ssid", config.ssid);
 		uci.set("wireless", backhaul_sta, "key", config.key);
 		uci.set("wireless", backhaul_sta, "multi_ap", "1");
