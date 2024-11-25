@@ -687,6 +687,14 @@ return view.extend({
 					break;
 			}
 		};
+		option.onchangeWithEncryption = function (ev, sectionId, value, encryption) {
+			if (encryption) {
+				const encryptionElement = this.section.getUIElement(sectionId, 'encryption');
+				encryptionElement.setValue(encryption);
+				encryptionElement.node.querySelector('select').dispatchEvent(new Event('change'));
+			}
+			this.section.getUIElement(sectionId, '_wpa_key')?.setValue('');
+		};
 
 		option.cfgvalue = function (section_id) {
 			const mode = uci.get('wireless', section_id, 'mode');

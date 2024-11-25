@@ -490,40 +490,27 @@ return wizard.AbstractWizardView.extend({
 		};
 
 		if (wifiDeviceName) {
-			let encryptionBySSID = {};
-			const uplink_ssid = option = page.option(morseui.EditableList, 'uplink_ssid', _('<abbr title="Service Set Identifier">SSID</abbr>'));
+			option = page.option(morseui.SSIDListScan, 'uplink_ssid', _('<abbr title="Service Set Identifier">SSID</abbr>'));
 			// Have to be explicit here because we change uciconfig/section/option.
 			option.depends('network.wizard.uplink', 'wifi');
 			option.uciconfig = 'wireless';
 			option.ucisection = wifiStaInterfaceName;
 			option.ucioption = 'ssid';
-			option.datatype = 'maxlength(32)';
-			option.retain = true;
+			option.staOnly = true;
+			option.scanAlerts = true;
 			option.rmempty = false;
-			option.btnText = _('Scan');
-			option.onclick = async () => {
-				encryptionBySSID = await this.doScan(wifiDeviceName, 'Master', uplink_ssid);
-				const ssids = Object.keys(encryptionBySSID);
-
-				const element = uplink_ssid.getUIElement(uplink_ssid.section.section);
-				element.clearChoices();
-				if (ssids.length > 0) {
-					element.addChoices(ssids);
-					element.setValue(ssids[0]);
-				}
-			};
-			option.onchange = function (ev, sectionId, value) {
+			option.retain = true;
+			option.scanEncryptions = ['psk2', 'psk', 'sae', 'none'];
+			option.onchangeWithEncryption = function (ev, sectionId, value, encryption) {
 				thisWizardView.onchangeOptionUpdateDiagram(this);
-				if (encryptionBySSID[value]) {
-					encryption.getUIElement(sectionId).setValue(encryptionBySSID[value]);
-				}
-				this.section.getUIElement(sectionId, 'uplink_key')?.setValue('');
+				this.section.getUIElement(sectionId, 'uplink_encryption').setValue(encryption);
+				this.section.getUIElement(sectionId, 'uplink_key').setValue('');
 			};
 
 			// 2.4 Credentials are one of the few things we don't want to retain,
 			// as users might be putting more sensitive creds here
 			// (i.e. if you disable, this should disappear).
-			const encryption = option = page.option(form.ListValue, 'uplink_encryption', _('Encryption'));
+			option = page.option(form.ListValue, 'uplink_encryption', _('Encryption'));
 			option.uciconfig = 'wireless';
 			option.ucisection = wifiStaInterfaceName;
 			option.ucioption = 'encryption';

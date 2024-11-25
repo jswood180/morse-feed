@@ -562,15 +562,20 @@ var UITimeoutModal = function (changes, extraHrefs) {
  * Will retry if no results or error.
  *
  * @param {string} iface
+ * @param {array} encryptions  allowed encryptions (default null == all) (WARNING: currently only _best_ encryptions)
  * @param {string} mode  (default 'Master')
  * @param {number} retries  how many times to retry the scan (until without error + some results)
  * @returns {object} map of ssids to preferred encryption
  */
-async function scanWifi(iface, mode = 'Master', retries = 6) {
+async function scanWifi(iface, encryptions = null, mode = 'Master', retries = 6) {
 	let scanResults = [];
+	const minimumTimeBetweenScansMs = 500;
+
 	for (let i = 0; i < retries; ++i) {
+		const startTimeMs = performance.now();
 		try {
-			scanResults = (await callIwinfoScan(iface)).filter(result => result.mode == mode);
+			scanResults = (await callIwinfoScan(iface))
+				.filter(result => result.mode == mode && (!encryptions || encryptions.includes(getBestEncryption(result))));
 
 			if (scanResults.length > 0) {
 				break;
@@ -580,6 +585,13 @@ async function scanWifi(iface, mode = 'Master', retries = 6) {
 			if (retries === i + 1) {
 				throw e;
 			}
+		}
+
+		// Don't retry too quickly if we're getting nothing useful back.
+		// We may be waiting for interface to configure itself.
+		const timeElapsedMs = startTimeMs - performance.now();
+		if (timeElapsedMs < minimumTimeBetweenScansMs) {
+			await new Promise(r => setTimeout(r, minimumTimeBetweenScansMs - timeElapsedMs));
 		}
 	}
 
@@ -599,7 +611,7 @@ async function scanWifi(iface, mode = 'Master', retries = 6) {
  * @returns {string} best encryption string
  */
 function getBestEncryption(result) {
-	const enc = result.enc;
+	const enc = result.encryption;
 	// From wireless.js
 	const is_psk = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
 		return a == 'psk';
@@ -621,11 +633,14 @@ function getBestEncryption(result) {
 	}
 }
 
-/* If the adjacent mode is sta, adds a 'scan' button to Value
+/* If the adjacent mode is sta or this.staOnly=true, adds a 'scan' button to Value
  * (and update itself + encryption if necessary).
  *
  * If the adjacent mode is not sta, just present a value (without a button).
  *
+ * This odd widget exists so we can render a single SSID widget
+ * in tables, as having two widgets (one hidden based on depends)
+ * would cause an extra table column.
  * Requires the map to call renderUpdate when appropriate
  * (i.e. when the mode changes).
  */
@@ -633,29 +648,37 @@ var CBISSIDListScan = form.Value.extend({
 	__name__: 'CBI.SSIDWithScan',
 	__init__: function () {
 		this.super('__init__', arguments);
-		this.scanResults = null;
+
+		// These are the options that can be set from outside.
+		this.staOnly = false; // Force STA mode only (otherwise read from 'mode' in form).
+		this.scanAlerts = false; // Show a message if scan returns nothing (separate div).
+		this.scanEncryptions = null; // Restrict scans based on these encryptions (default all).
+
+		this.datatype = 'and(maxlength(32),minlength(2))';
+
+		// Internal variables.
+		this.scanResults = {};
 	},
 
 	onchange(ev, sectionId, value) {
-		if (this.section.formvalue(sectionId, 'mode') === 'sta') {
-			if (this.scanResults && this.scanResults[value]) {
-				const encryption = this.section.getUIElement(sectionId, 'encryption');
-				if (encryption) {
-					encryption.setValue(getBestEncryption(this.scanResults[value]));
-					// Programmatic change doesn't cause 'change' event for a select, but we may need to
-					// add a 'Key' field after an encryption change.
-					encryption.node.querySelector('select').dispatchEvent(new Event('change'));
-				}
-			}
+		if (!this.onchangeWithEncryption) {
+			return;
 		}
+
+		let encryption = null;
+		if (this.isStaMode(sectionId) && this.scanResults[sectionId] && this.scanResults[sectionId][value]) {
+			encryption = getBestEncryption(this.scanResults[sectionId][value]);
+		}
+
+		this.onchangeWithEncryption(ev, sectionId, value, encryption);
 	},
 
-	renderSSID: function (ssid) {
-		if (!this.scanResults) {
+	renderSSID(sectionId, ssid) {
+		if (!this.scanResults[sectionId]) {
 			return ssid;
 		}
 
-		const res = this.scanResults[ssid];
+		const res = this.scanResults[sectionId][ssid];
 		let qualityPercent = -1;
 		if (res && res.quality > 0 && res.quality_max > 0) {
 			qualityPercent = Math.floor((res.quality * 100 / res.quality_max));
@@ -684,38 +707,55 @@ var CBISSIDListScan = form.Value.extend({
 		].filter(v => v));
 	},
 
-	renderStaWidget: function (sectionId, optionIndex, cfgvalue) {
+	renderStaWidget(sectionId, optionIndex, cfgvalue) {
 		this.clear();
 
 		if (cfgvalue) {
-			this.value(cfgvalue, this.renderSSID(cfgvalue));
+			this.value(cfgvalue, this.renderSSID(sectionId, cfgvalue));
 		}
 
-		const scanResults = Object.values(this.scanResults || {});
+		const scanResults = Object.values(this.scanResults[sectionId] || {});
 		scanResults.sort((a, b) => (b.quality || 0) - (a.quality || 0));
 
 		for (const res of scanResults) {
 			if (res['ssid'] !== cfgvalue) {
-				this.value(res['ssid'], this.renderSSID(res['ssid']));
+				this.value(res['ssid'], this.renderSSID(sectionId, res['ssid']));
 			}
 		}
 
-		return E('div', { class: 'control-group' }, [
+		this.alertMessage = E('div', { class: 'alert-message error', style: 'display: none' }, _('No Access Points found.'));
+
+		const widget = E('div', { class: 'control-group' }, [
 			form.Value.prototype.renderWidget.call(this, sectionId, optionIndex, cfgvalue),
 			E('button', {
 				'class': 'cbi-button cbi-button-action',
 				'title': _('Scan for wifi networks'),
 				'aria-label': _('Scan for wifi networks'),
 				'click': ui.createHandlerFn(this, async () => {
-					this.scanResults = await scanWifi(uci.get('wireless', sectionId, 'device'));
+					this.scanResults[sectionId] = await scanWifi(uci.get('wireless', this.ucisection || sectionId, 'device'), this.scanEncryptions);
 					this.renderUpdate(sectionId);
+
+					this.alertMessage.style.display = this.scanResults[sectionId].length === 0 ? 'block' : 'none';
 				}),
 			}, '\u{1F50D}'),
 		]);
+
+		if (this.scanAlerts) {
+			return E('div', {}, [
+				widget,
+				this.alertMessage,
+			]);
+		} else {
+			return widget;
+		}
+	},
+
+	isStaMode(sectionId) {
+		return this.staOnly || ['sta', 'sta-wds'].includes(this.section.formvalue(sectionId, 'mode'));
 	},
 
 	renderWidget: function (sectionId, optionIndex, cfgvalue) {
-		if (['sta', 'sta-wds'].includes(this.section.formvalue(sectionId, 'mode'))) {
+		if (this.isStaMode(sectionId)) {
 			return this.renderStaWidget(sectionId, optionIndex, cfgvalue);
 		} else {
 			this.clear();

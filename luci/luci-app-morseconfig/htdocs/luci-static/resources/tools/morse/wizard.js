@@ -13,14 +13,6 @@ const DEFAULT_LAN_IP = '10.42.0.1';
 const DEFAULT_WLAN_IP = '192.168.1.1';
 const ALTERNATE_WLAN_IP = '192.168.2.1';
 
-const callIwinfoScan = rpc.declare({
-	object: 'iwinfo',
-	method: 'scan',
-	params: ['device'],
-	nobatch: true,
-	expect: { results: [] },
-});
-
 const callUciCommit = rpc.declare({
 	object: 'uci',
 	method: 'commit',
@@ -1020,41 +1012,6 @@ const AbstractWizardView = view.extend({
 		removeExtraWifiIfaces();
 
 		await uci.save();
-	},
-
-	async doScan(iface, mode) {
-		const scanResult = (await callIwinfoScan(iface)).filter(result => result.mode == mode);
-
-		function getBestEncryption(enc) {
-			// From wireless.js
-			const is_psk = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
-				return a == 'psk';
-			}).length > 0);
-			const is_sae = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
-				return a == 'sae';
-			}).length > 0);
-
-			if (is_sae) {
-				return 'sae';
-			} else if (is_psk) {
-				if (enc.wpa.includes(2)) {
-					return 'psk2';
-				} else {
-					return 'psk';
-				}
-			} else {
-				return 'none';
-			}
-		}
-
-		const result = {};
-		for (const res of scanResult) {
-			if (res['ssid'] && !result[res['ssid']]) {
-				result[res['ssid']] = getBestEncryption(res.encryption);
-			}
-		}
-
-		return result;
 	},
 });
 

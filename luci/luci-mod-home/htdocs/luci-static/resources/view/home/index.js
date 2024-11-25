@@ -289,8 +289,18 @@ function createSystemCard(boardinfo) {
 async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) {
 	const map = new form.Map('wireless');
 	const s = map.section(form.NamedSection, wifiNetwork.getName());
-	s.option(morseui.SSIDListScan, 'ssid', _('SSID'));
-	let o = s.option(form.Value, 'key', _('Key/Password'));
+	let o = s.option(morseui.SSIDListScan, 'ssid', _('SSID'));
+	o.staOnly = true;
+	o.onchangeWithEncryption = function (ev, sectionId, value, encryption) {
+		this.section.getUIElement(sectionId, 'key').setValue('');
+		if (encryption) {
+			const encryptionElement = this.section.getUIElement(sectionId, 'encryption');
+			encryptionElement.setValue(encryption);
+			encryptionElement.node.querySelector('select').dispatchEvent(new Event('change'));
+		}
+	};
+
+	o = s.option(form.Value, 'key', _('Key/Password'));
 	o.password = true;
 
 	// Put only the most used (i.e. key based) options in encryption.
@@ -300,9 +310,6 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) 
 			o.value(k, ENCRYPTION_OPTIONS[k]);
 		}
 	}
-
-	// We put this hidden value in so that SSIDListScan understands it's a STA.
-	s.option(form.HiddenValue, 'mode');
 
 	const dppQRCodeSlider = new morseui.UISlider('0', ['0', '1'], {});
 	const dppQRCodeSliderElement = dppQRCodeSlider.render();
