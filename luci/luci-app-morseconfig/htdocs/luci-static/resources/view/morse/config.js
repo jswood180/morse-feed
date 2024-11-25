@@ -675,7 +675,7 @@ return view.extend({
 			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
 		}
 		option.readonly = readOnly;
-		option.datatype = 'and(maxlength(32),minlength(2))';
+		option.rmempty = false;
 		option.write = function (sectionId, value) {
 			const mode = this.map.lookupOption('mode', sectionId)[0].formvalue(sectionId);
 			switch (mode) {
