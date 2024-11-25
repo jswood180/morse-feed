@@ -272,6 +272,7 @@ return wizard.AbstractWizardView.extend({
 			uci.set('wireless', wifiStaInterfaceName, 'mode', 'sta');
 		}
 
+		const initialMorseMode = uci.get('wireless', morseInterfaceName, 'mode');
 		if (uci.get('luci', 'wizard', 'used') !== '1') {
 			// Force user to make this choice again if wizard not used.
 			uci.unset('wireless', morseInterfaceName, 'mode');
@@ -353,7 +354,7 @@ return wizard.AbstractWizardView.extend({
 		};
 		// Make sure we only load the SSID if we were already an AP; otherwise (or if unset) use default instead.
 		option.load = sectionId =>
-			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'ssid'))
+			((uci.get('wireless', morseDeviceName, 'mode') || initialMorseMode) === 'ap' && uci.get('wireless', sectionId, 'ssid'))
 			|| morseuci.getDefaultSSID();
 
 		option = page.option(form.Value, 'key', _('Passphrase'));
@@ -364,7 +365,7 @@ return wizard.AbstractWizardView.extend({
 		option.retain = true;
 		// Make sure we only load the key if we were already an AP; otherwise (or if unset) use default instead.
 		option.load = sectionId =>
-			(uci.get('wireless', sectionId, 'mode') === 'ap' && uci.get('wireless', sectionId, 'key'))
+			((uci.get('wireless', morseDeviceName, 'mode') || initialMorseMode) === 'ap' && uci.get('wireless', sectionId, 'key'))
 			|| morseuci.getDefaultWifiKey();
 
 		option = page.option(widgets.WifiFrequencyValue, '_freq', '<br />' + _('Operating Frequency'));
@@ -455,7 +456,7 @@ return wizard.AbstractWizardView.extend({
 			this.section.getUIElement(sectionId, 'sta_key')?.setValue('');
 		};
 		// Only load SSID if STA mode.
-		option.load = sectionId => uci.get('wireless', sectionId, 'mode') === 'sta' ? uci.get('wireless', sectionId, 'ssid') : '';
+		option.load = sectionId => (uci.get('wireless', morseDeviceName, 'mode') || initialMorseMode) === 'sta' ? uci.get('wireless', sectionId, 'ssid') : '';
 
 		option = page.option(form.Value, 'sta_key', _('Passphrase'));
 		option.depends({ mode: 'sta', dpp: '0' });
@@ -465,7 +466,7 @@ return wizard.AbstractWizardView.extend({
 		option.rmempty = false;
 		option.retain = true;
 		// Only load the key if STA mode.
-		option.load = sectionId => uci.get('wireless', sectionId, 'mode') === 'sta' ? uci.get('wireless', sectionId, 'key') : '';
+		option.load = sectionId => (uci.get('wireless', morseDeviceName, 'mode') || initialMorseMode) === 'sta' ? uci.get('wireless', sectionId, 'key') : '';
 
 		/*****************************************************************************/
 
