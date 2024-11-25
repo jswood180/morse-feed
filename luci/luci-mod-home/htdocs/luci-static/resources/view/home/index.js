@@ -323,8 +323,7 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) 
 		}
 	}
 
-	let element;
-	element = E('details', {
+	const element = E('details', {
 		id,
 		'class': 'uplink-connect',
 		'open': isUp ? null : '', // Show by default if we're not connected.
@@ -347,6 +346,14 @@ async function renderUplinkWifiConnectMethods(id, hasQRCode, wifiNetwork, isUp) 
 							map.checkDepends();
 							await map.parse();
 							await updateAfterUciChange();
+							// hack - sleep so that the user can't press the button again until
+							// some attempt to connect has happened, otherwise this action is really fast
+							// and you might think nothing has happened at all. Use pollinterval since there's
+							// some chance that within this amount of time we'll have updated our connection status.
+							// We do this since there's no trivial way to feed the wpa_supplicant status back
+							// while we wait; note that if connection succeeds, Connected will change to 'Yes'
+							// and the connection methods box will be hidden (see updateUplinkWifiConnectMethods).
+							await new Promise(resolveFn => window.setTimeout(resolveFn, L.env.pollinterval * 1000 * 2));
 						}),
 					}, _('Save & Apply')),
 				]),
