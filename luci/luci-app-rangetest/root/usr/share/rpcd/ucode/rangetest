@@ -20,6 +20,7 @@
  *  - morse_cli_stats_reset( interface ) => nothing
  */
 
+import * as ubus from 'ubus';
 const fs = require('fs');
 const uloop = require('uloop');
 const math = require('math');
@@ -48,13 +49,12 @@ function get_output_file_paths(id) {
  */
 function delete_output_directory(id) {
 	const dir = `${BG_OUTPUT_DIR}/${id}`;
-	if (!fs.access(BG_OUTPUT_DIR, 'f') && !fs.access(dir, 'f')) { return false; }
+	if (!fs.access(dir, 'f')) { exit(ubus.STATUS_SYSTEM_ERROR); }
 	const output_file_paths = get_output_file_paths(id);
 	for (file in output_file_paths) {
 		fs.unlink(output_file_paths[file]);
 	}
 	fs.rmdir(dir);
-	return true;
 }
 
 /**
@@ -64,10 +64,10 @@ function delete_output_directory(id) {
  * and should only be called alongside the `killall -q iperf3` commands.
  */
 function clean_output_directories() {
-	if (!fs.access(BG_OUTPUT_DIR, 'f')) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!fs.access(BG_OUTPUT_DIR, 'f')) { return; }
 
 	const output_directories = fs.lsdir(BG_OUTPUT_DIR);
-	if (!output_directories) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!output_directories) { exit(ubus.STATUS_SYSTEM_ERROR); }
 
 	for (dir in output_directories) { delete_output_directory(dir); }
 }
@@ -75,23 +75,34 @@ function clean_output_directories() {
 function execute_background_command(command) {
 	const id = math.rand();
 
-	if (!fs.access(BG_OUTPUT_DIR, 'f') && !fs.mkdir(`${BG_OUTPUT_DIR}`)) { exit(UBUS_STATUS_SYSTEM_ERROR); }
-	if (!fs.mkdir(`${BG_OUTPUT_DIR}/${id}`)) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!fs.access(BG_OUTPUT_DIR, 'f')) {
+		if (!fs.mkdir(BG_OUTPUT_DIR)) { 
+			exit(ubus.STATUS_SYSTEM_ERROR);
+		}
+	}
+	if (!fs.mkdir(`${BG_OUTPUT_DIR}/${id}`)) { 
+		exit(ubus.STATUS_SYSTEM_ERROR);
+	}
 
 	const output_file_paths = get_output_file_paths(id);
 	for (file in output_file_paths) {
 		const n_bytes_written = fs.writefile(output_file_paths[file], null);
-		if (n_bytes_written == null) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+		if (n_bytes_written == null) { exit(ubus.STATUS_SYSTEM_ERROR); }
 	}
 
 	const stdout_redirect_param = ` 1>${output_file_paths.stdout}`;
 	const stderr_redirect_param = ` 2>${output_file_paths.stderr}`;
 	command += `${stdout_redirect_param} ${stderr_redirect_param}`;
 	const proc = uloop.task((pipe) => {
-		const exit_code = system(command);
+		/* Has cover-all 10 minute timeout for hanging
+		 * iperf3 servers. Since the frontend knows the expected 
+		 * time each iperf test will take this timeout could be adjusted
+		 * to a more appropriate per-test value in future.
+		 */
+		const exit_code = system(command, 6000000);
 		fs.writefile(output_file_paths.exit_code, exit_code);
 	});
-	if (!proc) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!proc) { exit(ubus.STATUS_SYSTEM_ERROR); }
 
 	return { id: id };
 }
@@ -108,8 +119,8 @@ function background_iperf3_client(req) {
 	const udp = req.args.udp ? '-u' : '';
 	const reverse = req.args.reverse ? '-R' : '';
 	const time = req.args.time;
-	if (time >= OUTPUT_DIR_TTL) { exit(UBUS_STATUS_INVALID_COMMAND); } 
-	if (iptoarr(target) == null) { exit(UBUS_STATUS_INVALID_ARGUMENT); } 
+	if (time >= OUTPUT_DIR_TTL) { exit(ubus.STATUS_INVALID_ARGUMENT); } 
+	if (iptoarr(target) == null) { exit(ubus.STATUS_INVALID_ARGUMENT); } 
 
 	system('killall -q iperf3', 1000);
 	clean_output_directories();
@@ -123,7 +134,7 @@ function get_background(req) {
 	const output_file_paths = get_output_file_paths(id);
 	const output_data = {};
 	for (file in output_file_paths) {
-		if (!fs.access(output_file_paths[file], 'f')) {	exit(UBUS_STATUS_SYSTEM_ERROR); }
+		if (!fs.access(output_file_paths[file], 'f')) {	exit(ubus.STATUS_SYSTEM_ERROR); }
 		output_data[file] = fs.readfile(output_file_paths[file]);
 	}
 
@@ -133,36 +144,46 @@ function get_background(req) {
 	if (output_data.exit_code == '') {
 		return {};
 	}
-
+	
 	/* The background iperf is complete, there output
 	 * should be json formatted due to the `--json` flag.
 	 */
 	if (output_data.exit_code == '0') { 
 		return json(output_data.stdout);
 	}
-
-	exit(UBUS_STATUS_SYSTEM_ERROR); 
+	
+	exit(ubus.STATUS_SYSTEM_ERROR); 
 }
 
 function execute_command(command) {
 	let proc = fs.popen(command);
-	if (!proc) { exit(UBUS_STATUS_SYSTEM_ERROR); }
+	if (!proc) { exit(ubus.STATUS_SYSTEM_ERROR); }
 	const output = proc.read('all');
 	const exit_code = proc.close();
-	if (exit_code != 0) { exit(UBUS_STATUS_SYSTEM_ERROR); }
-	return output;
+	return { 
+		output: output, 
+		exit_code: exit_code 
+	};
 }
 
 function iw_station_dump(req) {
 	const interface_name = req.args.interface;
-	const output = execute_command(`iw ${interface_name} station dump`);
-	return { output: output };
+	const results = execute_command(`iw ${interface_name} station dump`);
+	if (results.exit_code == 0) {
+		return { output: results.output };
+	} else {
+		return { output: '' };
+	}
 }
 
 function morse_cli_stats(req) {
 	const interface_name = req.args.interface;
-	const output = execute_command(`morse_cli -i ${interface_name} stats -j`);
-	return json(output);
+	const results = execute_command(`morse_cli -i ${interface_name} stats -j`);
+	if (results.exit_code == 0) {
+		return json(results.output);
+	} else {
+		return {};
+	}
 }
 
 function morse_cli_stats_reset(req) {

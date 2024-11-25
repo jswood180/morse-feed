@@ -136,6 +136,8 @@ async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, prog
 		if (clientPollResponse === ui.CANCEL) {
 			testProgressBar.reset('Test Cancelled');
 			throw new Error('Test Cancelled');
+		} else if (Number.isInteger(clientPollResponse) && clientPollResponse !== 0) {
+			throw new Error(`Request to local device failed with UBUS code: ${clientPollResponse}`);
 		} else if (Object.keys(clientPollResponse).length > 0) {
 			completed = true;
 		} else {
