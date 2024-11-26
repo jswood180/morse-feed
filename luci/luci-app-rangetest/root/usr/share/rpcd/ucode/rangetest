@@ -25,13 +25,12 @@ const fs = require('fs');
 const uloop = require('uloop');
 const math = require('math');
 
-const BG_OUTPUT_DIR = '/var/run/rangetest';
-
 /* This is weird because running the iperf3 server
  * with -s -1 --json will not produce any output
  * until the end, so assume that no iperf test runs > 5 minutes.
  */
 const OUTPUT_DIR_TTL = 300;
+const BG_OUTPUT_DIR = '/var/run/rangetest';
 
 function get_output_file_paths(id) {
 	return {
@@ -87,7 +86,9 @@ function execute_background_command(command) {
 	const output_file_paths = get_output_file_paths(id);
 	for (file in output_file_paths) {
 		const n_bytes_written = fs.writefile(output_file_paths[file], null);
-		if (n_bytes_written == null) { exit(ubus.STATUS_SYSTEM_ERROR); }
+		if (n_bytes_written == null) { 
+			exit(ubus.STATUS_SYSTEM_ERROR);
+		}
 	}
 
 	const stdout_redirect_param = ` 1>${output_file_paths.stdout}`;
@@ -151,7 +152,6 @@ function get_background(req) {
 	if (output_data.exit_code == '0') { 
 		return json(output_data.stdout);
 	}
-	
 	exit(ubus.STATUS_SYSTEM_ERROR); 
 }
 

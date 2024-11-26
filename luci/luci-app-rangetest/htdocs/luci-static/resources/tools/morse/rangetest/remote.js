@@ -96,8 +96,7 @@ var RemoteRpcClass = rpc.constructor.extend({
 			if (isAuthCheck && returnCode === 6) {
 				throw new Error(`Login attempt to ${this.remoteRpcBaseUrl} failed, please try a different password`);
 			}
-			const message = rpc.getStatusText(returnCode) || 'Unknown';
-			throw new Error(`Request to ${this.remoteRpcBaseUrl} failed with: ${message} (${returnCode})`);
+			throw new Error(`Request to ${this.remoteRpcBaseUrl} failed with UBUS code: ${returnCode}`);
 		}
 
 		return response.result[1];
@@ -109,6 +108,18 @@ var RemoteRpcClass = rpc.constructor.extend({
 
 	getBackground: async function (id) {
 		return this.__call('get_background', { id: id });
+	},
+
+	iwStationDump: async function (interfaceName) {
+		return this.__call('iw_station_dump', { interface: interfaceName });
+	},
+
+	morseCliStatsReset: async function (interfaceName) {
+		return this.__call('morse_cli_stats_reset', { interface: interfaceName });
+	},
+
+	morseCliStats: async function (interfaceName) {
+		return this.__call('morse_cli_stats', { interface: interfaceName });
 	},
 
 	/**

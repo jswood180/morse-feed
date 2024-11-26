@@ -44,7 +44,35 @@ const getBackground = rpc.declare({
 	params: ['id'],
 });
 
+const iwStationDump = rpc.declare({
+	object: 'rangetest',
+	method: 'iw_station_dump',
+	params: ['interface'],
+});
+
+const morseCliStatsReset = rpc.declare({
+	object: 'rangetest',
+	method: 'morse_cli_stats_reset',
+	params: ['interface'],
+});
+
+const morseCliStats = rpc.declare({
+	object: 'rangetest',
+	method: 'morse_cli_stats',
+	params: ['interface'],
+});
+
 let availableRemoteDevices = {};
+const iperf3ResultsTemplate = {
+	iperf3: {
+		udp: { receive: {}, send: {} },
+		tcp: { receive: {}, send: {} },
+	},
+};
+const testResultsTemplate = {
+	local: { ...iperf3ResultsTemplate },
+	remote: { ...iperf3ResultsTemplate },
+};
 
 /**
  * Validate GPS or manually entered coordinate input.
@@ -77,19 +105,25 @@ function validateDecimalDegrees(sectionId, value) {
 	return true;
 }
 
-async function runRangetest(cancelPromise, config, testProgressBar) {
+async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	const {
 		advanced: {
+			// logfileDirectory,
 			protocol: protocols,
 			direction: directions,
 		},
 		basic: {
-			remoteDeviceInfo: { ipv4: [remoteIp] },
+			remoteDeviceInfo: {
+				ipv4: [remoteIp],
+				iface: interfaceName,
+			},
 			remoteDevicePassword: remotePassword,
 		},
-	} = config;
+	} = configuration;
 	let remoteRangetestDevice = remoteDevice.load(remoteIp, remotePassword);
 
+	// const testId = Math.random().toString(16).slice(2);
+	let testResults = { ...testResultsTemplate };
 	const iperf3TestTime = 10;
 	const iperf3PollInterval = 2;
 
@@ -98,22 +132,39 @@ async function runRangetest(cancelPromise, config, testProgressBar) {
 	testProgressBar.show();
 	testProgressBar.reset('Beginning...');
 
+	await remoteRangetestDevice.remoteRpc.morseCliStatsReset(interfaceName);
+	await morseCliStatsReset(interfaceName);
+
 	try {
 		for (const protocol of protocols) {
 			for (const direction of directions) {
-				testProgressBar.text = `${protocol} ${direction}`;
-				const iperf3ServerResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
-				const iperf3ClientResponse = await backgroundIperf3Client(remoteIp, (protocol.toLowerCase() === 'udp'), (direction.toLowerCase() === 'receive'), iperf3TestTime);
-				const iperf3ClientResults = await waitForIperf3Results(iperf3ClientResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
-				const iperf3ServerResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3ServerResponse.id);
+				testProgressBar.text = `${protocol.toUpperCase()} ${direction}`;
 
-				console.log(`DEBUG: iperf3 ${protocol} ${direction} client results`, iperf3ClientResults);
-				console.log(`DEBUG: iperf3 ${protocol} ${direction} server results`, iperf3ServerResults);
+				const iperf3RemoteResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
+				const iperf3LocalResponse = await backgroundIperf3Client(remoteIp, (protocol === 'udp'), (direction === 'receive'), iperf3TestTime);
+				const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
+				const iperf3RemoteResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3RemoteResponse.id);
+
+				testResults['local']['iperf3'][protocol][direction] = iperf3LocalResults;
+				testResults['remote']['iperf3'][protocol][direction] = iperf3RemoteResults;
+
+				// saveTestData(logfileDirectory, testId, testResults);
 			}
 		}
 
+		const morseCliStatsRemoteResponse = await remoteRangetestDevice.remoteRpc.morseCliStats(interfaceName);
+		const morseCliStatsLocalResponse = await morseCliStats(interfaceName);
+		const iwDumpRemoteResponse = await remoteRangetestDevice.remoteRpc.iwStationDump(interfaceName);
+		const iwDumpLocalResponse = await iwStationDump(interfaceName);
+
+		testResults['local']['morseCli'] = morseCliStatsLocalResponse;
+		testResults['remote']['morseCli'] = morseCliStatsRemoteResponse;
+		testResults['local']['iw'] = iwDumpLocalResponse['output'];
+		testResults['remote']['iw'] = iwDumpRemoteResponse['output'];
+		// saveTestData(logfileDirectory, testId, testResults);
+
 		testProgressBar.complete('Test Complete');
-		// TODO: save results to file and show in table
+		return testResults;
 	} catch (error) {
 		testProgressBar.reset('Test Failed');
 		console.error(error);
@@ -157,19 +208,20 @@ return view.extend({
 		this.rangetestConfiguration = {
 			basic: {},
 			advanced: {
-				protocol: ['UDP', 'TCP'],
-				direction: ['Send', 'Receive'],
+				protocol: ['udp', 'tcp'],
+				direction: ['send', 'receive'],
 				logfileDirectory: '/tmp/rangetest',
 			},
 		};
 	},
 
-	async handleStartTest(ev, cancelPromise, basicTestConfigurationForm) {
+	async handleStartTest(ev, cancelPromise) {
 		try {
-			await basicTestConfigurationForm.parse();
+			await this.basicTestConfigurationForm.parse();
 			const hostname = this.rangetestConfiguration.basic.remoteDeviceHostname;
 			this.rangetestConfiguration.basic.remoteDeviceInfo = availableRemoteDevices[hostname];
-			await runRangetest(cancelPromise, this.rangetestConfiguration, this.testProgressBar);
+			const testResults = await runRangetest(cancelPromise, this.rangetestConfiguration, this.testProgressBar);
+			console.log(testResults);
 		} catch (error) {
 			console.error(error);
 			ui.addNotification(_('Rangetest error'), E('pre', {}, error.message), 'error');
@@ -184,7 +236,7 @@ return view.extend({
 		ui.addNotification(null, E('p', {}, _('DEBUG: delete all')));
 	},
 
-	async renderBasicTestConfigurationForm() {
+	basicTestConfigurationForm() {
 		const m = new form.JSONMap(this.rangetestConfiguration);
 		const s = m.section(form.NamedSection, 'basic');
 		let o;
@@ -269,13 +321,10 @@ return view.extend({
 		progressBarContainer = E('div', { class: 'cbi-progressbar', style: 'margin: 0 2em 0 2em; visibility: hidden;' }, progressBarElement = E('div', { style: 'width: 0%' }));
 		this.testProgressBar = progressBar.new(progressBarContainer, progressBarElement);
 
-		return E([], [
-			await m.render(),
-			E('div', { class: 'cbi-page-actions', style: 'display: flex; align-items: center;' }, [
-				E('button', { class: 'cbi-button cbi-button-action', click: ui.createCancellableHandlerFn(this, this.handleStartTest, _('Stop'), m) }, [_('Start Test')]),
-				progressBarContainer,
-			]),
-		]);
+		this.progressBarContainer = E('div', { class: 'cbi-progressbar', style: 'margin: 0 2em 0 2em; visibility: hidden;' }, this.progressBarElement = E('div', { style: 'width: 0%' }));
+		this.testProgressBar = progressBar.new(this.progressBarContainer, this.progressBarElement);
+
+		return m;
 	},
 
 	async renderAdvancedTestConfigurationForm() {
@@ -284,14 +333,14 @@ return view.extend({
 		let o;
 
 		o = s.option(form.MultiValue, 'protocol', _('Protocol'));
-		o.value('UDP', _('UDP'));
-		o.value('TCP', _('TCP'));
+		o.value('udp', _('UDP'));
+		o.value('tcp', _('TCP'));
 		o.rmempty = false;
 		o.optional = false;
 
 		o = s.option(form.MultiValue, 'direction', _('Data Direction'));
-		o.value('Send', _('Send'));
-		o.value('Receive', _('Receive'));
+		o.value('send', _('Send'));
+		o.value('receive', _('Receive'));
 		o.rmempty = false;
 		o.optional = false;
 
@@ -315,7 +364,7 @@ return view.extend({
 		]);
 	},
 
-	async renderResultsSummaryTable() {
+	resultsSummaryTable() {
 		const m = new form.JSONMap(null);
 		const s = m.section(form.GridSection, 'basic');
 		s.anonymous = true;
@@ -370,20 +419,12 @@ return view.extend({
 		o.datatype = 'integer';
 		o.readonly = true;
 
-		return E([], [
-			await m.render(),
-			E('div', { class: 'cbi-section-create cbi-tblsection-create' }, [
-				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, this.handleExportAllTestData) }, [_('Export All')]),
-				E('button', { class: 'cbi-button cbi-button-remove', click: ui.createHandlerFn(this, this.handleDeleteAllTestData) }, [_('Delete All')]),
-			]),
-		]);
+		return m;
 	},
 
 	async render() {
-		const [basicTestConfigurationForm, resultsSummaryTable] = await Promise.all([
-			this.renderBasicTestConfigurationForm(),
-			this.renderResultsSummaryTable(),
-		]);
+		this.basicTestConfigurationForm = this.basicTestConfigurationForm();
+		this.resultsSummaryTable = this.resultsSummaryTable();
 
 		const titleSection = E('section', { class: 'cbi-section' }, [
 			E('h2', {}, _('Range Test')),
@@ -408,11 +449,19 @@ return view.extend({
 					click: ui.createHandlerFn(this, this.renderAdvancedTestConfigurationForm),
 				}),
 			]),
-			basicTestConfigurationForm,
+			await this.basicTestConfigurationForm.render(),
+			E('div', { class: 'cbi-page-actions', style: 'display: flex; align-items: center;' }, [
+				E('button', { class: 'cbi-button cbi-button-action', click: ui.createCancellableHandlerFn(this, this.handleStartTest, _('Stop')) }, [_('Start Test')]),
+				this.progressBarContainer,
+			]),
 		]);
 		const resultsSummarySection = E('section', { class: 'cbi-section' }, [
 			E('h3', {}, _('Results Summary')),
-			resultsSummaryTable,
+			await this.resultsSummaryTable.render(),
+			E('div', { class: 'cbi-section-create cbi-tblsection-create' }, [
+				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, this.handleExportAllTestData) }, [_('Export All')]),
+				E('button', { class: 'cbi-button cbi-button-remove', click: ui.createHandlerFn(this, this.handleDeleteAllTestData) }, [_('Delete All')]),
+			]),
 		]);
 
 		const res = [
