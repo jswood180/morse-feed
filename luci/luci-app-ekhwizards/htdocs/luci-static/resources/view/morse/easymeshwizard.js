@@ -354,7 +354,9 @@ return wizard.AbstractWizardView.extend({
 
 		page = this.page(morseApInterfaceSection,
 			_('Setup EasyMesh Network'),
-			_(`All devices in the mesh will have the same <b>SSID</b>.`));
+			_(`All devices in the EasyMesh network will share the same <b>SSID</b> and
+				 MUST operate on the same <b>Operating Frequency</b>.<br> On an EasyMesh Agent,
+				 the SSID is auto-configured by the Controller after successful pairing.`));
 
 		page.enableDiagram({
 			extras: ['AP_HALOW_INT_SELECT', 'AP_HALOW_INT_SELECT_FILL'],
@@ -387,7 +389,6 @@ return wizard.AbstractWizardView.extend({
 			|| morseuci.getDefaultWifiKey();
 
 		option = page.option(widgets.WifiFrequencyValue, '_freq', '<br />' + _('Operating Frequency'));
-		option.depends(`prplmesh.config.master`, '1');
 		option.ucisection = morseDeviceName;
 		option.rmempty = false;
 		option.retain = true;
