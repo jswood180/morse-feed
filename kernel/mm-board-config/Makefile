@@ -60,8 +60,16 @@ define Package/morse-board-config/install
 
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/lib/firmware/morse/* $(1)/lib/firmware/morse/
 
-	# Install all files from override folder, including failsafe.
-	$(INSTALL_DATA) ./files/lib/firmware/morse/* $(1)/lib/firmware/morse/
+	# Install files from override folder, including failsafe.
+	for file in ./files/lib/firmware/morse/*; do \
+		filename=$$$$(basename $$$$file); \
+		if [ -e "$(PKG_BUILD_DIR)/lib/firmware/morse/$$$$filename" ]; then \
+			echo "Error: Attempting to override $$$$filename which already exists in morse_bcf repo."; \
+			exit 1; \
+		else \
+			$(INSTALL_DATA) $$$$file $(1)/lib/firmware/morse/; \
+		fi; \
+	done
 
 	# Link the failsafe bcf by default so userspace can query the driver.
 	ln -s /lib/firmware/morse/bcf_failsafe.bin $(1)/lib/firmware/morse/bcf_default.bin
