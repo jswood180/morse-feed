@@ -160,7 +160,7 @@ EOF
 			morse,ekh01v2)
 				bcf=bcf_mf08251.bin
 			;;
-			morse,ekh04v4)
+			morse,ekh04v6)
 				bcf=bcf_ekh04_v4.bin
 			;;
 			morse,artini)
