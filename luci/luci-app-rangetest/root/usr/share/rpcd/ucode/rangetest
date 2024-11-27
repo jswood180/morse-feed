@@ -6,7 +6,7 @@
  * The goal is to eventually move everything into the backend here with 
  * the frontend range testing UI being as dumb as possible. This is an
  * interim solution for the sake of time. The frontend will not have to 
- * do any specific error handling and will only receive a UBUS code if 
+ * do any specific error handling and will only receive a UBUS/RPC code if 
  * errors are encountered.
  * 
  * Background commands create process output files in /var/run/rangetest/<id>.
@@ -15,9 +15,10 @@
  *  - background_iperf3_server() => { id }
  *  - background_iperf3_client() => { id, udp, reverse }
  *  - background_iperf3_result( id ) => json_blob
- *  - iw_dump( interface ) => { output: ... }
- *  - morse_cli_stats( interface ) => json_blob
+ *  - iw_station_dump( interface ) => { output: ... }
  *  - morse_cli_stats_reset( interface ) => nothing
+ *  - morse_cli_stats( interface ) => json_blob
+ *  - morse_cli_channel( interface ) => json_blob
  */
 
 import * as ubus from 'ubus';
@@ -30,6 +31,7 @@ const math = require('math');
  * until the end, so assume that no iperf test runs > 5 minutes.
  */
 const OUTPUT_DIR_TTL = 300;
+const IPERF_OMIT_TIME = 2;
 const BG_OUTPUT_DIR = '/var/run/rangetest';
 
 function get_output_file_paths(id) {
@@ -117,15 +119,15 @@ function background_iperf3_server(req) {
 
 function background_iperf3_client(req) {
 	const target = req.args.target;
-	const udp = req.args.udp ? '-u' : '';
+	const udp = req.args.udp ? '-u -b 40M' : '';
 	const reverse = req.args.reverse ? '-R' : '';
 	const time = req.args.time;
-	if (time >= OUTPUT_DIR_TTL) { exit(ubus.STATUS_INVALID_ARGUMENT); } 
+	if (time <= IPERF_OMIT_TIME || time >= OUTPUT_DIR_TTL) { exit(ubus.STATUS_INVALID_ARGUMENT); } 
 	if (iptoarr(target) == null) { exit(ubus.STATUS_INVALID_ARGUMENT); } 
 
 	system('killall -q iperf3', 1000);
 	clean_output_directories();
-	const command = `iperf3 -c ${target} ${udp} ${reverse} -t ${time} --json`;
+	const command = `iperf3 -c ${target} ${udp} ${reverse} -t ${time} -O ${IPERF_OMIT_TIME} --json`;
 	return execute_background_command(command);
 }
 
@@ -176,6 +178,12 @@ function iw_station_dump(req) {
 	}
 }
 
+function morse_cli_stats_reset(req) {
+	const interface_name = req.args.interface;
+	execute_command(`morse_cli -i ${interface_name} stats -r`);
+	return {};
+}
+
 function morse_cli_stats(req) {
 	const interface_name = req.args.interface;
 	const results = execute_command(`morse_cli -i ${interface_name} stats -j`);
@@ -186,10 +194,14 @@ function morse_cli_stats(req) {
 	}
 }
 
-function morse_cli_stats_reset(req) {
+function morse_cli_channel(req) {
 	const interface_name = req.args.interface;
-	execute_command(`morse_cli -i ${interface_name} stats -r`);
-	return {};
+	const results = execute_command(`morse_cli -i ${interface_name} channel -j`);
+	if (results.exit_code == 0) {
+		return json(results.output);
+	} else {
+		return {};
+	}
 }
 
 return {
@@ -226,6 +238,12 @@ return {
 		},
 		morse_cli_stats: {
 			call: morse_cli_stats,
+			args: {
+				interface: 'wlan0',
+			},
+		},
+		morse_cli_channel: {
+			call: morse_cli_channel,
 			args: {
 				interface: 'wlan0',
 			},

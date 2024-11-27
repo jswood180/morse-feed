@@ -25,12 +25,11 @@ var ProgressBar = baseclass.extend({
 	},
 
 	increment(percent) {
-		this.percentage += percent;
-		if (this.percentage > 100) {
-			console.error('Progress bar incremented past 100%');
-			this.complete('');
+		if (this.percentage + percent > 100) {
+			console.warn('Progress bar incremented past 100%');
 			return;
 		}
+		this.percentage += percent;
 		this.__update();
 	},
 

@@ -4,13 +4,19 @@
 		"write": {
 			"ubus": {
 				"umdns": [ "update", "browse" ],
-				"rangetest": [ "background_iperf3_server", "background_iperf3_client", "get_background", "iw_station_dump", "morse_cli_stats_reset", "morse_cli_stats" ],
+				"rangetest": [ "background_iperf3_server", "background_iperf3_client", "get_background", "iw_station_dump", "morse_cli_stats_reset", "morse_cli_stats", "morse_cli_channel" ],
 				"rangetest-remote-rpc": [ "request" ]
+			},
+			"file": {
+				"/tmp/rangetest/*": [ "write", "remove" ]
 			}
 		},
 		"read": {
 			"file": {
-				"/etc/init.d/umdns restart" : [ "exec" ]
+				"/etc/init.d/umdns restart" : [ "exec" ],
+				"mkdir -p /tmp/rangetest" : [ "exec" ],
+				"/tmp/rangetest" : [ "list" ],
+				"/tmp/rangetest/*" : [ "read" ]
 			}
 		}
 	}

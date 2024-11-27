@@ -13,6 +13,8 @@
 'require tools.morse.rangetest.remote as remoteDevice';
 'require tools.morse.rangetest.progressbar as progressBar';
 
+const TEST_RESULT_DIRECTORY = '/tmp/rangetest';
+
 document.querySelector('head').appendChild(E('link', {
 	rel: 'stylesheet',
 	type: 'text/css',
@@ -62,6 +64,18 @@ const morseCliStats = rpc.declare({
 	params: ['interface'],
 });
 
+const morseCliChannel = rpc.declare({
+	object: 'rangetest',
+	method: 'morse_cli_channel',
+	params: ['interface'],
+});
+
+const iwinfo = rpc.declare({
+	object: 'iwinfo',
+	method: 'info',
+	params: ['device'],
+});
+
 let availableRemoteDevices = {};
 const iperf3ResultsTemplate = {
 	iperf3: {
@@ -70,6 +84,8 @@ const iperf3ResultsTemplate = {
 	},
 };
 const testResultsTemplate = {
+	id: 0,
+	timestamp: '-',
 	local: { ...iperf3ResultsTemplate },
 	remote: { ...iperf3ResultsTemplate },
 };
@@ -105,10 +121,32 @@ function validateDecimalDegrees(sectionId, value) {
 	return true;
 }
 
+/* Uses the Haversine formula from https://www.movable-type.co.uk/scripts/latlong.html
+ */
+function getDistanceBetweenDecimalDegreesCoordinates(lat1, lon1, lat2, lon2) {
+	const R = 6371e3; // metres
+	const φ1 = lat1 * Math.PI / 180; // φ, λ in radians
+	const φ2 = lat2 * Math.PI / 180;
+	const Δφ = (lat2 - lat1) * Math.PI / 180;
+	const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+	const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2)
+		+ Math.cos(φ1) * Math.cos(φ2)
+		* Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+	const d = R * c; // in metres
+
+	return d;
+}
+
+/* Manages the core rangetest functionality here.
+ *
+ * This functionality should eventually be transferred to the backend.
+ */
 async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	const {
 		advanced: {
-			// logfileDirectory,
 			protocol: protocols,
 			direction: directions,
 		},
@@ -122,8 +160,11 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	} = configuration;
 	let remoteRangetestDevice = remoteDevice.load(remoteIp, remotePassword);
 
-	// const testId = Math.random().toString(16).slice(2);
 	let testResults = { ...testResultsTemplate };
+	testResults.id = Math.random().toString(16).slice(8);
+	testResults.configuration = configuration;
+	testResults.timestamp = new Date().toISOString();
+
 	const iperf3TestTime = 10;
 	const iperf3PollInterval = 2;
 
@@ -132,44 +173,94 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	testProgressBar.show();
 	testProgressBar.reset('Beginning...');
 
+	testResults['local']['iwinfo'] = await iwinfo(interfaceName);
 	await remoteRangetestDevice.remoteRpc.morseCliStatsReset(interfaceName);
 	await morseCliStatsReset(interfaceName);
 
+	for (const protocol of protocols) {
+		for (const direction of directions) {
+			testProgressBar.text = `${protocol.toUpperCase()} ${direction}`;
+
+			const iperf3RemoteResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
+			const iperf3LocalResponse = await backgroundIperf3Client(remoteIp, (protocol === 'udp'), (direction === 'receive'), iperf3TestTime);
+			const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
+			const iperf3RemoteResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3RemoteResponse.id);
+
+			testResults['local']['iperf3'][protocol][direction]['end'] = iperf3LocalResults?.end;
+			testResults['remote']['iperf3'][protocol][direction]['end'] = iperf3RemoteResults?.end;
+		}
+	}
+
+	const morseCliChannelLocalResponse = await morseCliChannel(interfaceName);
+	const morseCliStatsRemoteResponse = await remoteRangetestDevice.remoteRpc.morseCliStats(interfaceName);
+	const morseCliStatsLocalResponse = await morseCliStats(interfaceName);
+	const iwDumpRemoteResponse = await remoteRangetestDevice.remoteRpc.iwStationDump(interfaceName);
+	const iwDumpLocalResponse = await iwStationDump(interfaceName);
+
+	testResults['local']['morseCliChannel'] = morseCliChannelLocalResponse;
+	testResults['local']['morseCliStats'] = morseCliStatsLocalResponse;
+	testResults['remote']['morseCliStats'] = morseCliStatsRemoteResponse;
+	testResults['local']['iw'] = iwDumpLocalResponse['output'];
+	testResults['remote']['iw'] = iwDumpRemoteResponse['output'];
+
+	testProgressBar.complete('Test Complete');
+	saveLocalTest(testResults.id, testResults);
+	return testResults;
+}
+
+async function getLocalTests() {
 	try {
-		for (const protocol of protocols) {
-			for (const direction of directions) {
-				testProgressBar.text = `${protocol.toUpperCase()} ${direction}`;
-
-				const iperf3RemoteResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
-				const iperf3LocalResponse = await backgroundIperf3Client(remoteIp, (protocol === 'udp'), (direction === 'receive'), iperf3TestTime);
-				const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
-				const iperf3RemoteResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3RemoteResponse.id);
-
-				testResults['local']['iperf3'][protocol][direction] = iperf3LocalResults;
-				testResults['remote']['iperf3'][protocol][direction] = iperf3RemoteResults;
-
-				// saveTestData(logfileDirectory, testId, testResults);
+		const filenames = await fs.list(TEST_RESULT_DIRECTORY);
+		const sortedFilenames = filenames.sort((a, b) => new Date(a.ctime) - new Date(b.ctime));
+		const testResults = [];
+		for (const file of sortedFilenames) {
+			const path = `${TEST_RESULT_DIRECTORY}/${file.name}`;
+			try {
+				const content = await fs.read_direct(path, 'json');
+				testResults.push(content);
+			} catch (readError) {
+				console.warn(`Error reading file: ${path}`, readError);
 			}
 		}
-
-		const morseCliStatsRemoteResponse = await remoteRangetestDevice.remoteRpc.morseCliStats(interfaceName);
-		const morseCliStatsLocalResponse = await morseCliStats(interfaceName);
-		const iwDumpRemoteResponse = await remoteRangetestDevice.remoteRpc.iwStationDump(interfaceName);
-		const iwDumpLocalResponse = await iwStationDump(interfaceName);
-
-		testResults['local']['morseCli'] = morseCliStatsLocalResponse;
-		testResults['remote']['morseCli'] = morseCliStatsRemoteResponse;
-		testResults['local']['iw'] = iwDumpLocalResponse['output'];
-		testResults['remote']['iw'] = iwDumpRemoteResponse['output'];
-		// saveTestData(logfileDirectory, testId, testResults);
-
-		testProgressBar.complete('Test Complete');
 		return testResults;
 	} catch (error) {
-		testProgressBar.reset('Test Failed');
-		console.error(error);
-		ui.addNotification(_('Error'), E('pre', {}, `${error.message}`), 'error');
+		return [];
 	}
+}
+
+async function deleteLocalTest(testId) {
+	const path = `${TEST_RESULT_DIRECTORY}/${testId}`;
+	try {
+		await fs.remove(path);
+	} catch (error) {
+		console.warn(`Error deleting file: ${path}`, error);
+	}
+}
+
+function saveLocalTest(testId, data) {
+	const path = `${TEST_RESULT_DIRECTORY}/${testId}`;
+	try {
+		fs.exec_direct('mkdir', ['-p', TEST_RESULT_DIRECTORY]);
+		fs.write(path, JSON.stringify(data));
+	} catch (error) {
+		console.warn(`Error saving file: ${path}`, error);
+	}
+}
+
+function exportTestDataAsJSONFile(data, fileName) {
+	const dataString = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+	var downloadAnchorNode = document.createElement('a');
+	downloadAnchorNode.setAttribute('href', dataString);
+	downloadAnchorNode.setAttribute('download', `${fileName}.json`);
+	document.body.appendChild(downloadAnchorNode);
+	downloadAnchorNode.click();
+	downloadAnchorNode.remove();
+}
+
+function formatFilenameDatetime(date) {
+	const pad = num => String(num).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_`
+		+ `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 }
 
 async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, progressIncrement, testProgressBar, cancelPromise) {
@@ -180,6 +271,7 @@ async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, prog
 
 	while (!completed) {
 		if (Date.now() - startTime > timeout) {
+			testProgressBar.reset('Test Failed');
 			throw new Error(`Range test client has timed out`);
 		}
 		await new Promise(resolve => setTimeout(resolve, pollInterval * 1000));
@@ -199,6 +291,62 @@ async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, prog
 	return clientPollResponse;
 }
 
+function parseResultsSummaryRowData(data) {
+	const { local, remote } = data;
+
+	const timestamp = new Date(data.timestamp).toLocaleString('en-US');
+
+	let localCoords = data.configuration.basic?.localDeviceCoordinates;
+	let remoteCoords = data.configuration.basic?.remoteDeviceCoordinates;
+	let locationURL;
+	if (localCoords && remoteCoords) {
+		localCoords = localCoords.replace(/\s+/g, '');
+		remoteCoords = remoteCoords.replace(/\s+/g, '');
+		locationURL = `https://www.google.com/maps/dir/?api=1&origin=${localCoords}&destination=${remoteCoords}&travelmode=walking`;
+	}
+
+	const bandwidth = data.local.morseCliChannel?.channel_op_bw;
+	const channel = data.local.iwinfo?.channel
+		? `${data.local.iwinfo.channel} (${data.local.iwinfo.frequency / 1e3} MHz)`
+		: undefined;
+
+	const parseThroughputValue = (value) => {
+		if (typeof value === 'number' && !isNaN(value)) {
+			return (value / 1e6).toFixed(2);
+		}
+		return '-';
+	};
+
+	// Only display the receiving end of the iperf for data.
+	// Recall that in 'receive' mode, iperf runs with the reverse
+	// flag (-R) where the client (the local device) receives traffic.
+	const udpThroughputSend = parseThroughputValue(remote.iperf3.udp.send.end?.sum_received?.bits_per_second);
+	const udpThroughputReceive = parseThroughputValue(local.iperf3.udp.receive.end?.sum_sent?.bits_per_second);
+	const tcpThroughputSend = parseThroughputValue(remote.iperf3.tcp.send.end?.sum_received?.bits_per_second);
+	const tcpThroughputReceive = parseThroughputValue(local.iperf3.tcp.receive.end?.sum_sent?.bits_per_second);
+
+	const udpThroughput = `${udpThroughputSend} / ${udpThroughputReceive}`;
+	const tcpThroughput = `${tcpThroughputSend} / ${tcpThroughputReceive}`;
+
+	const localSignalStrength = local?.iw?.match(/signal avg:\t(-?\d+)\s+dBm/)?.[1];
+
+	return {
+		id: data.id,
+		timestamp: timestamp,
+		remoteHostname: data.configuration.basic?.remoteDeviceHostname,
+		description: data.configuration.basic?.description,
+		distance: data.configuration.basic?.range,
+		location: locationURL,
+		bandwidth: bandwidth,
+		channel: channel,
+		udpThroughput: udpThroughput,
+		tcpThroughput: tcpThroughput,
+		signalStrength: localSignalStrength,
+		export: true,
+		rawData: data,
+	};
+}
+
 return view.extend({
 	handleSaveApply: null,
 	handleSave: null,
@@ -210,9 +358,18 @@ return view.extend({
 			advanced: {
 				protocol: ['udp', 'tcp'],
 				direction: ['send', 'receive'],
-				logfileDirectory: '/tmp/rangetest',
 			},
 		};
+		return Promise.all([getLocalTests()]);
+	},
+
+	addResultsSummaryRow(data) {
+		const parsedRowData = parseResultsSummaryRowData(data);
+		const rowIndex = Object.keys(this.resultsSummaryTable.data.data).length;
+		this.resultsSummaryTable.data.add(null, String(rowIndex), String(rowIndex));
+		Object.assign(this.resultsSummaryTable.data.data[rowIndex], parsedRowData);
+		this.resultsSummaryTable.load();
+		this.resultsSummaryTable.save();
 	},
 
 	async handleStartTest(ev, cancelPromise) {
@@ -221,24 +378,17 @@ return view.extend({
 			const hostname = this.rangetestConfiguration.basic.remoteDeviceHostname;
 			this.rangetestConfiguration.basic.remoteDeviceInfo = availableRemoteDevices[hostname];
 			const testResults = await runRangetest(cancelPromise, this.rangetestConfiguration, this.testProgressBar);
-			console.log(testResults);
+			this.addResultsSummaryRow(testResults);
 		} catch (error) {
 			console.error(error);
 			ui.addNotification(_('Rangetest error'), E('pre', {}, error.message), 'error');
 		}
 	},
 
-	handleExportAllTestData() {
-		ui.addNotification(null, E('p', {}, _('DEBUG: export all')));
-	},
-
-	handleDeleteAllTestData() {
-		ui.addNotification(null, E('p', {}, _('DEBUG: delete all')));
-	},
-
 	basicTestConfigurationForm() {
+		const sectionId = 'basic';
 		const m = new form.JSONMap(this.rangetestConfiguration);
-		const s = m.section(form.NamedSection, 'basic');
+		const s = m.section(form.NamedSection, sectionId);
 		let o;
 
 		const remoteDeviceSelect = s.option(form.ListValue, 'remoteDeviceHostname', _('Remote device'), _('The remote device which this test will be conducted against'));
@@ -275,9 +425,9 @@ return view.extend({
 		};
 
 		// Extend the select element to also render a discover button
-		const renderWidget = remoteDeviceSelect.renderWidget;
-		remoteDeviceSelect.renderWidget = function (sectionId, option_index, cfgvalue) {
-			const dropdown = renderWidget.call(this, sectionId, option_index, cfgvalue);
+		const originalSelectRenderWidget = remoteDeviceSelect.renderWidget;
+		remoteDeviceSelect.renderWidget = function (sectionId, optionIndex, cfgvalue) {
+			const dropdown = originalSelectRenderWidget.call(this, sectionId, optionIndex, cfgvalue);
 			const button = E('button', {
 				id: 'discover-button',
 				class: 'cbi-button cbi-button-action',
@@ -298,24 +448,52 @@ return view.extend({
 
 		o = s.option(form.Value, 'description', _('Description'), _('Optional: short description of the test conditions'));
 		o.datatype = 'string';
-		o.placeholder = _('NLOS, elephant in the way...');
+		o.placeholder = _('line of sight, low noise environment...');
 		o.optional = true;
 
-		o = s.option(form.Value, 'local_device_coordinates', _('Local device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
-		o.validate = validateDecimalDegrees;
-		o.placeholder = '-33.885553, 151.211138';	// MM Sydney office
-		o.optional = true;
+		let localDeviceCoordinatesInput = s.option(form.Value, 'localDeviceCoordinates', _('Local device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
+		localDeviceCoordinatesInput.validate = validateDecimalDegrees;
+		localDeviceCoordinatesInput.placeholder = '-33.885553, 151.211138';	// MM Sydney office
+		localDeviceCoordinatesInput.optional = true;
 
-		o = s.option(form.Value, 'remote_device_coordinates', _('Remote device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
-		o.validate = validateDecimalDegrees;
-		o.placeholder = '-34.168550, 150.611910';	// MM Picton office
-		o.optional = true;
+		let remoteDeviceCoordinatesInput = s.option(form.Value, 'remoteDeviceCoordinates', _('Remote device coordinates'), _('Optional: Must be provided in Decimal Degrees (DD) format, used by Google Maps'));
+		remoteDeviceCoordinatesInput.validate = validateDecimalDegrees;
+		remoteDeviceCoordinatesInput.placeholder = '-34.168550, 150.611910';	// MM Picton office
+		remoteDeviceCoordinatesInput.optional = true;
 
-		o = s.option(form.Value, 'range', _('Range (m)'), _('The distance between devices under test'));
-		o.datatype = 'and(min(1), uinteger)';
-		o.placeholder = _('500');
-		o.rmempty = false;
-		o.optional = false;
+		let rangeInput = s.option(form.Value, 'range', _('Range (m)'), _('The distance between devices under test'));
+		rangeInput.datatype = 'and(min(1), uinteger)';
+		rangeInput.placeholder = _('500');
+		rangeInput.rmempty = false;
+		rangeInput.optional = false;
+
+		// If the user manually enters the range, remove any invalid coordinate input
+		rangeInput.onchange = () => {
+			localDeviceCoordinatesInput.getUIElement(sectionId).setValue(null);
+			remoteDeviceCoordinatesInput.getUIElement(sectionId).setValue(null);
+		};
+
+		const updateRangeIfUsingCoordinates = function () {
+			let localCoords = localDeviceCoordinatesInput.getUIElement(sectionId).getValue();
+			let remoteCoords = remoteDeviceCoordinatesInput.getUIElement(sectionId).getValue();
+			if (localCoords === '' || !localDeviceCoordinatesInput.isValid(sectionId) || remoteCoords === '' || !remoteDeviceCoordinatesInput.isValid(sectionId)) {
+				return;
+			}
+
+			localCoords = localCoords.replace(/\s+/g, '');
+			remoteCoords = remoteCoords.replace(/\s+/g, '');
+
+			let localLat, localLong, remoteLat, remoteLong;
+			[localLat, localLong] = localCoords.split(',').map(parseFloat);
+			[remoteLat, remoteLong] = remoteCoords.split(',').map(parseFloat);
+			const newRange = getDistanceBetweenDecimalDegreesCoordinates(localLat, localLong, remoteLat, remoteLong);
+
+			rangeInput.getUIElement(sectionId).setValue(Math.round(newRange));
+			rangeInput.triggerValidation(sectionId);
+		};
+
+		localDeviceCoordinatesInput.onchange = updateRangeIfUsingCoordinates;
+		remoteDeviceCoordinatesInput.onchange = updateRangeIfUsingCoordinates;
 
 		let progressBarContainer, progressBarElement;
 		progressBarContainer = E('div', { class: 'cbi-progressbar', style: 'margin: 0 2em 0 2em; visibility: hidden;' }, progressBarElement = E('div', { style: 'width: 0%' }));
@@ -344,12 +522,6 @@ return view.extend({
 		o.rmempty = false;
 		o.optional = false;
 
-		// This requires special validation and will be hardcoded for now
-		// o = s.option(form.Value, 'logfileDirectory', _('Logfile Directory'), _('All data inside /tmp/ will be erased on reboot'));
-		// o.datatype = 'directory';
-		// o.readonly = true;
-		// o.placeholder = '/tmp/rangetest';
-
 		const save = async () => {
 			await m.save();
 			ui.hideModal();
@@ -366,67 +538,112 @@ return view.extend({
 
 	resultsSummaryTable() {
 		const m = new form.JSONMap(null);
-		const s = m.section(form.GridSection, 'basic');
+		const s = m.section(form.GridSection);
+		s.addremove = true;
 		s.anonymous = true;
 		s.nodescriptions = true;
 
 		let o;
 
-		o = s.option(form.Value, 'id', _('ID'));
+		s.handleRemove = async function (sectionId, _ev) {
+			var configName = this.map.config;
+			const testId = this.map.data.data[sectionId].id;
+			ui.showModal(_('Confirm Deletion'), [
+				E('p', {}, _('Are you sure?')),
+				E('div', { class: 'right' }, [
+					E('button', {
+						class: 'cbi-button cbi-button-negative',
+						click: ui.createHandlerFn(this, async () => {
+							deleteLocalTest(testId);
+							this.map.data.remove(configName, sectionId);
+							this.map.save(null, true);
+							ui.hideModal();
+						}),
+					}, _('Delete')),
+					' ',
+					E('button', {
+						class: 'cbi-button',
+						click: ui.hideModal,
+					}, _('Cancel')),
+				]),
+			]);
+		};
+
+		o = s.option(form.DummyValue, 'timestamp', _('Time'));
 		o.datatype = 'string';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'timestamp', _('Timestamp'));
+		o = s.option(form.DummyValue, 'remoteHostname', _('Remote Hostname'));
 		o.datatype = 'string';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'remote_hostname', _('Remote Hostname'));
-		o.datatype = 'string';
-		o.readonly = true;
-
-		o = s.option(form.Value, 'description', _('Description'));
+		o = s.option(form.DummyValue, 'description', _('Description'));
 		o.datatype = 'string';
 
-		o = s.option(form.Value, 'status', _('Status'));
-		o.datatype = 'string';
-		o.readonly = true;
-
-		o = s.option(form.Value, 'distance', _('Distance (m)'));
+		o = s.option(form.DummyValue, 'distance', _('Distance (m)'));
 		o.datatype = 'uinteger';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'location', _('Location'));
-		o.datatype = 'string';
-		o.readonly = true;
+		const locationLink = s.option(form.DummyValue, 'location', _('Location'));
+		locationLink.editable = true;
+		locationLink.renderWidget = function (sectionId, optionIndex, cfgvalue) {
+			if (!cfgvalue) {
+				return E('em', {}, 'unknown');
+			}
 
-		o = s.option(form.Value, 'bandwidth', _('Bandwidth (MHz)'));
+			return E('div', { style: 'display: flex; align-items: flex-start; gap: 1em;' }, [
+				E('a', {
+					href: cfgvalue,
+					target: '_blank',
+					rel: 'noopener noreferrer',
+				}, [_('map view')]),
+			]);
+		};
+
+		o = s.option(form.DummyValue, 'bandwidth', _('Bandwidth (MHz)'));
 		o.datatype = 'uinteger';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'channel', _('Channel'));
+		o = s.option(form.DummyValue, 'channel', _('Channel'));
 		o.datatype = 'uinteger';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'udp_throughput', _('UDP Throughput (Mbps) (Send/Receive)'));
+		o = s.option(form.DummyValue, 'udpThroughput', _('UDP Throughput (Mbps) (Send/Receive)'));
 		o.datatype = 'string';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'tcp_throughput', _('TCP Throughput (Mbps) (Send/Receive)'));
+		o = s.option(form.DummyValue, 'tcpThroughput', _('TCP Throughput (Mbps) (Send/Receive)'));
 		o.datatype = 'string';
 		o.readonly = true;
 
-		o = s.option(form.Value, 'signal_strength', _('Signal Strength (dBm)'));
+		o = s.option(form.DummyValue, 'signalStrength', _('Signal Strength (dBm)'));
 		o.datatype = 'integer';
 		o.readonly = true;
+
+		const downloadButton = s.option(form.DummyValue, 'export', _('Data'));
+		downloadButton.editable = true;
+		downloadButton.renderWidget = function (sectionId, _optionIndex, _cfgvalue) {
+			return E('div', { style: 'display: flex; align-items: flex-start; gap: 1em;' }, [
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					click: ui.createHandlerFn(this, () => {
+						const rawData = this.map.data.data[sectionId].rawData;
+						const ISOdatetimeString = this.map.data.data[sectionId].timestamp;
+						const filenameDatetimeString = formatFilenameDatetime(new Date(ISOdatetimeString));
+						exportTestDataAsJSONFile(rawData, `rangetest_data_${filenameDatetimeString}`);
+					}),
+				}, [_('Download')]),
+			]);
+		};
 
 		return m;
 	},
 
-	async render() {
+	async render([localTests]) {
 		this.basicTestConfigurationForm = this.basicTestConfigurationForm();
 		this.resultsSummaryTable = this.resultsSummaryTable();
 
-		const titleSection = E('section', { class: 'cbi-section' }, [
+		this.titleSection = E('section', { class: 'cbi-section' }, [
 			E('h2', {}, _('Range Test')),
 			E('div', { class: 'cbi-map-descr' }, _('This is a network utility to perform static range tests.')),
 			E('div', { class: 'cbi-map-descr' }, [
@@ -440,7 +657,7 @@ return view.extend({
 				]),
 			]),
 		]);
-		const configurationSection = E('section', { class: 'cbi-section' }, [
+		this.configurationSection = E('section', { class: 'cbi-section' }, [
 			E('h3', {}, [
 				_('Test Configuration'),
 				E('button', {
@@ -455,22 +672,30 @@ return view.extend({
 				this.progressBarContainer,
 			]),
 		]);
-		const resultsSummarySection = E('section', { class: 'cbi-section' }, [
+		this.resultsSummarySection = E('section', { class: 'cbi-section' }, [
 			E('h3', {}, _('Results Summary')),
 			await this.resultsSummaryTable.render(),
 			E('div', { class: 'cbi-section-create cbi-tblsection-create' }, [
-				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, this.handleExportAllTestData) }, [_('Export All')]),
-				E('button', { class: 'cbi-button cbi-button-remove', click: ui.createHandlerFn(this, this.handleDeleteAllTestData) }, [_('Delete All')]),
+				E('button', { class: 'cbi-button cbi-button-action', click: ui.createHandlerFn(this, async () => {
+					const filenameDatetimeString = formatFilenameDatetime(new Date());
+					const allTests = await getLocalTests();
+					if (allTests.length === 0) {
+						ui.addNotification(null, E('pre', {}, 'No test data available!'));
+						return;
+					}
+					exportTestDataAsJSONFile(allTests, `rangetest_all_data_${filenameDatetimeString}`);
+				}) }, [_('Download All Data')]),
 			]),
 		]);
 
 		const res = [
-			titleSection,
-			configurationSection,
-			resultsSummarySection,
+			this.titleSection,
+			this.configurationSection,
+			this.resultsSummarySection,
 		];
 
-		configurationSection.querySelector('#discover-button').click();
+		localTests.forEach(test => this.addResultsSummaryRow(test));
+		this.configurationSection.querySelector('#discover-button').click();
 		return res;
 	},
 });
