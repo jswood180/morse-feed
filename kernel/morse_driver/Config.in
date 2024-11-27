@@ -13,6 +13,11 @@ config MORSE_SPI
 	default n
 	depends on PACKAGE_kmod-morse
 
+config MORSE_USB
+        bool "USB support "
+        default y
+        depends on PACKAGE_kmod-morse
+
 config MORSE_USER_ACCESS
 	bool "User space access support "
 	default y
