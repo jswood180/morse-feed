@@ -555,7 +555,9 @@ return view.extend({
 		section.anonymous = true;
 
 		// If we don't immediately set the correct device, it won't appear in our table
-		// due to the filter. So we monkey-patch handleAdd :(
+		// due to the filter. Also, the normal handleAdd saves the current state of the
+		// form to the backend, which is a bit rude.
+		// So we monkey-patch handleAdd :(
 		section.handleAdd = function (_ev, name) {
 			const config_name = this.uciconfig || this.map.config;
 
@@ -567,7 +569,25 @@ return view.extend({
 			}
 			this.map.data.add(config_name, this.sectiontype, name);
 			this.map.data.set(config_name, name, 'device', deviceName);
-			return this.map.save(null, true);
+			this.map.data.set(config_name, name, 'disabled', '1');
+			this.map.data.set(config_name, name, 'encryption', isMorse ? 'sae' : 'psk2');
+			this.map.data.set(config_name, name, 'ssid', morseuci.getDefaultSSID());
+			this.map.data.set(config_name, name, 'key', morseuci.getDefaultWifiKey());
+
+			// If lan doesn't exist in our dropdown, this won't ever save
+			// (i.e. it's safe to do if lan doesn't exist).
+			// However, setting it makes sure that it appears in the network ifaces
+			// list on the config page, as this goes to uci rather than the form
+			// to determine what to display (i.e. it won't pick up the form default
+			// until you mutate it).
+			this.map.data.set(config_name, name, 'network', 'lan');
+
+			// It's safe to simple load/reset here rather than doing
+			// a save since (to support the diagram) we're already putting
+			// everything into the uci cache (i.e. the 'reset' won't lose
+			// any data, _unlike_ hitting the Reset button on the page
+			// which causes a refresh).
+			return this.map.load().then(() => this.map.reset());
 		};
 
 		let option;
