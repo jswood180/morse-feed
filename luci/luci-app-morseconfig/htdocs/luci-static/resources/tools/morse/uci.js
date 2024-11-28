@@ -341,14 +341,6 @@ function setBridgeWithPorts(networkSectionId, ports) {
 	uci.set('network', networkSectionId, 'device', proposedName);
 }
 
-function getEthNetwork() {
-	for (const network of uci.sections('network', 'interface')) {
-		if (getNetworkDevices(network['.name']).some(d => d.startsWith('eth') || d.startsWith('lan'))) {
-			return network['.name'];
-		}
-	}
-}
-
 function getNetworkWifiIfaces(networkSectionId) {
 	return uci.sections('wireless', 'wifi-iface')
 		.filter(wifiIface => wifiIface.disabled !== '1' && wifiIface.network === networkSectionId);
@@ -530,7 +522,6 @@ return baseclass.extend({
 	getOrCreateDhcp,
 	useBridgeIfNeeded,
 	forceBridge,
-	getEthNetwork,
 	getNetworkDevices,
 	setNetworkDevices,
 	getNetworkWifiIfaces,

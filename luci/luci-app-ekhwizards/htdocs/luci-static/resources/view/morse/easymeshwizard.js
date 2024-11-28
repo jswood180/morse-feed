@@ -28,28 +28,37 @@ return wizard.AbstractWizardView.extend({
 		const {
 			wifiDeviceName,
 			wifiStaInterfaceName,
-			ethInterfaceName,
+			morseInterfaceName,
 		} = wizard.readSectionInfo();
 
 		const ahwlanZone = morseuci.getZoneForNetwork('ahwlan');
 		const lanZone = morseuci.getZoneForNetwork('lan');
 		const forwardsLanToAhwlan = uci.sections('firewall', 'forwarding').some(f => f.src === lanZone && f.dest === ahwlanZone && f.enabled !== '0');
-		const forwardsAhwlanToLan = uci.sections('firewall', 'forwarding').some(f => f.src === ahwlanZone && f.dest === lanZone && f.enabled !== '0');
+
+		const {
+			ethDHCPNetwork,
+			ethDHCPPort,
+			ethStaticNetwork,
+		} = wizard.readEthernetPortInfo(this.getEthernetPorts());
 
 		// If we weren't a mesh controller, force choice again.
 		const getUplink = () => {
 			if (uci.get('prplmesh', 'config', 'enable') !== '1' || uci.get('prplmesh', 'config', 'master') !== '1') {
 				return undefined;
-			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
+			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName) && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
 				return 'wifi';
-			} else if (
-				ethInterfaceName === 'lan' && uci.get('wireless', ethInterfaceName, 'network') === 'ahwlan'
-				&& uci.get('network', 'lan', 'proto') === 'static'
-				&& forwardsAhwlanToLan
-			) {
-				return 'ethernet';
-			} else {
+			} else if (ethDHCPNetwork) {
+				if (this.ethernetPorts.length > 1) {
+					return `ethernet-${ethDHCPPort}`;
+				} else {
+					return 'ethernet';
+				}
+			} else if (ethStaticNetwork !== uci.get('wireless', morseInterfaceName, 'network')) {
+				// HaLow is separate to ethernet, but there's no ethernet DHCP client.
+				// This is probably like 'none'.
 				return 'none';
+			} else {
+				return undefined;
 			}
 		};
 
@@ -57,7 +66,7 @@ return wizard.AbstractWizardView.extend({
 		const getDeviceModeMeshAgent = () => {
 			if (uci.get('prplmesh', 'config', 'enable') !== '1' || uci.get('prplmesh', 'config', 'master') !== '0') {
 				return undefined;
-			} else if (ethInterfaceName === 'lan') {
+			} else if (ethStaticNetwork === 'lan') {
 				return forwardsLanToAhwlan ? 'extender' : 'none';
 			} else {
 				return 'bridge';
@@ -168,6 +177,10 @@ return wizard.AbstractWizardView.extend({
 		};
 
 		const nonBridgeMode = () => {
+			// We exclude non-builtins to avoid accidentally bridging an LTE USB dongle running
+			// its own DHCP server (which will end up confusing the user a lot).
+			morseuci.setNetworkDevices('lan', this.getEthernetPorts().filter(p => p.builtin).map(p => p.device));
+
 			uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
 			uci.set('wireless', morseBackhaulStaName, 'network', 'ahwlan');
 
@@ -177,7 +190,6 @@ return wizard.AbstractWizardView.extend({
 
 			morseuci.useBridgeIfNeeded('lan');
 			morseuci.forceBridge('ahwlan', 'br-prpl', bridgeMAC);
-			morseuci.setNetworkDevices('lan', this.getEthernetPorts().map(p => p.device));
 
 			return { ethIface: 'lan', halowIface: 'ahwlan' };
 		};
@@ -191,22 +203,45 @@ return wizard.AbstractWizardView.extend({
 
 		// Set 'bridge/ip/gateway' etc. via uci,
 		// based on the selected uplink and traffic mode
-		this.ethIp = null;
 		if (isController) {
-			if (uplink === 'ethernet') {
-				const { ethIface, halowIface } = nonBridgeMode();
+			if (uplink?.match(/ethernet/)) {
+				const upstreamNetwork = this.getEthernetPorts().length > 1 ? 'wan' : 'lan';
 
-				uci.set('network', ethIface, 'proto', 'dhcp');
-				morseuci.setupNetworkWithDnsmasq(halowIface, wlanIp);
-				morseuci.getOrCreateForwarding(halowIface, ethIface, 'mmrouter');
+				if (upstreamNetwork === 'wan') {
+					morseuci.ensureNetworkExists('wan');
+					const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes('wan'));
+					uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
+					uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
+					morseuci.getOrCreateForwarding('ahwlan', 'wan');
+				} else {
+					morseuci.getOrCreateForwarding('ahwlan', 'lan', 'mmrouter');
+				}
+
+				// Devices
+				uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
+				if (isWifiAp) {
+					uci.set('wireless', wifiApInterfaceName, 'network', 'ahwlan');
+				}
+				const [_, port] = uplink.split('-');
+				if (port) {
+					morseuci.setNetworkDevices(upstreamNetwork, [port]);
+					morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().filter(p => p.device !== port).map(p => p.device));
+				} else {
+					morseuci.setNetworkDevices(upstreamNetwork, this.getEthernetPorts().map(p => p.device));
+				}
+
+				// Bridges
+				morseuci.useBridgeIfNeeded(upstreamNetwork);
+				morseuci.useBridgeIfNeeded('ahwlan');
+
+				uci.set('network', upstreamNetwork, 'proto', 'dhcp');
+				morseuci.setupNetworkWithDnsmasq('ahwlan', wlanIp);
 			} else if (uplink === 'none') {
 				const { ethIface, halowIface } = nonBridgeMode();
 
 				// This is a weird overload of the var name
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp, false);
 				morseuci.setupNetworkWithDnsmasq(halowIface, wlanIp, false);
-
-				this.ethIp = lanIp;
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
@@ -215,8 +250,6 @@ return wizard.AbstractWizardView.extend({
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);
 				morseuci.getOrCreateForwarding(iface, 'wifi24lan', 'wifi24forward');
-
-				this.ethIp = wlanIp;
 			}
 		} else {
 			if (device_mode_meshagent === 'extender') { // i.e. router
@@ -225,15 +258,11 @@ return wizard.AbstractWizardView.extend({
 				uci.set('network', halowIface, 'proto', 'dhcp');
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp);
 				morseuci.getOrCreateForwarding(ethIface, halowIface, 'mmextender');
-
-				this.ethIp = lanIp;
 			} else if (device_mode_meshagent === 'none') {
 				const { ethIface, halowIface } = nonBridgeMode();
 
 				uci.set('network', halowIface, 'proto', 'dhcp');
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp, false);
-
-				this.ethIp = lanIp;
 			} else if (device_mode_meshagent === 'bridge') {
 				const iface = bridgeMode();
 
@@ -475,12 +504,28 @@ return wizard.AbstractWizardView.extend({
 		option.widget = 'radio';
 		option.orientation = 'vertical';
 		option.value('none', _('None'));
-		option.value('ethernet', _('Ethernet (Router)'));
+		if (this.getEthernetPorts().length === 1) {
+			option.value('ethernet', _('Ethernet'));
+		} else if (this.getEthernetPorts().length > 1) {
+			const nonDonglePorts = [];
+			for (const port of this.getEthernetPorts()) {
+				if (!port.builtin) {
+					option.value(`ethernet-${port.device}`, `Dongle (${port.device}) - e.g. a USB LTE dongle or tethered phone`);
+				} else {
+					nonDonglePorts.push(port);
+				}
+			}
+
+			// Put the non-dongle ports at the end, as dongle is preferred.
+			for (const port of nonDonglePorts) {
+				option.value(`ethernet-${port.device}`, `Ethernet (${port.device})`);
+			}
+		}
 		if (wifiDeviceName) {
 			option.value('wifi', _('Wi-Fi (2.4 GHz)'));
 		}
 		option.onchange = function (ev, sectionId, value) {
-			if (value == 'ethernet') {
+			if (value.includes('ethernet')) {
 				this.page.updateInfoText(ethInfoAp, thisWizardView);
 			} else if (value == 'wifi') {
 				this.page.updateInfoText(wifiInfoAp, thisWizardView);
@@ -614,7 +659,7 @@ return wizard.AbstractWizardView.extend({
 		option = page.step(_(`
 			Connect this device to your existing network via an Ethernet cable.
 		`));
-		option.depends('network.wizard.uplink', 'ethernet');
+		option.depends('network.wizard.uplink', /^ethernet/);
 
 		if (wifiDeviceName) {
 			option = page.step(_(`

@@ -27,13 +27,17 @@ return wizard.AbstractWizardView.extend({
 			wifiDeviceName,
 			morseInterfaceName,
 			wifiStaInterfaceName,
-			ethInterfaceName,
 		} = wizard.readSectionInfo();
 
 		const ahwlanZone = morseuci.getZoneForNetwork('ahwlan');
 		const lanZone = morseuci.getZoneForNetwork('lan');
 		const forwardsLanToAhwlan = uci.sections('firewall', 'forwarding').some(f => f.src === lanZone && f.dest === ahwlanZone && f.enabled !== '0');
-		const forwardsAhwlanToLan = uci.sections('firewall', 'forwarding').some(f => f.src === ahwlanZone && f.dest === lanZone && f.enabled !== '0');
+
+		const {
+			ethDHCPNetwork,
+			ethDHCPPort,
+			ethStaticNetwork,
+		} = wizard.readEthernetPortInfo(this.getEthernetPorts());
 
 		// If we weren't a mesh gate, force choice again.
 		const getUplink = () => {
@@ -41,29 +45,33 @@ return wizard.AbstractWizardView.extend({
 				return undefined;
 			} else if (uci.get('mesh11sd', 'mesh_params', 'mesh_gate_announcements') !== '1') {
 				return undefined;
-			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
+			} else if (wifiDeviceName && uci.get('wireless', wifiStaInterfaceName) && uci.get('wireless', wifiStaInterfaceName, 'disabled') !== '1') {
 				return 'wifi';
-			} else if (
-				ethInterfaceName === 'lan' && uci.get('wireless', morseInterfaceName, 'network') === 'ahwlan'
-				&& uci.get('network', 'lan', 'proto') === 'static'
-				&& forwardsAhwlanToLan
-			) {
-				return 'ethernet';
-			} else if (
-				ethInterfaceName === uci.get('wireless', morseInterfaceName, 'network')
-				&& uci.get('network', ethInterfaceName, 'proto') === 'dhcp'
-			) {
-				return 'ethernet';
-			} else {
+			} else if (ethDHCPNetwork) {
+				if (this.ethernetPorts.length > 1) {
+					return `ethernet-${ethDHCPPort}`;
+				} else {
+					return 'ethernet';
+				}
+			} else if (ethStaticNetwork !== uci.get('wireless', morseInterfaceName, 'network')) {
+				// HaLow is separate to ethernet, but there's no ethernet DHCP client.
+				// This is probably like 'none'.
 				return 'none';
+			} else {
+				// Note that this captures the default OpenWrt, where the AP and ethernet port
+				// are on the same network and there's a DHCP server, but we don't support this mode
+				// in the wizard.
+				return undefined;
 			}
 		};
 
 		// If we weren't a mesh gate or our uplink wasn't ethernet, force choice again.
 		const getDeviceModeMeshGate = () => {
-			if (getUplink() === 'ethernet') {
-				if (ethInterfaceName === uci.get('wireless', morseInterfaceName, 'network')) {
+			if (getUplink()?.includes('ethernet')) {
+				if (ethDHCPNetwork === uci.get('wireless', morseInterfaceName, 'network')) {
 					return 'bridge';
+				} else if (ethDHCPNetwork === 'wan' && this.ethernetPorts.length > 1) {
+					return 'router_firewall';
 				} else {
 					return 'router';
 				}
@@ -78,10 +86,12 @@ return wizard.AbstractWizardView.extend({
 				return undefined;
 			} else if (uci.get('mesh11sd', 'mesh_params', 'mesh_gate_announcements') !== '0') {
 				return undefined;
-			} else if (ethInterfaceName === 'lan') {
+			} else if (ethStaticNetwork === 'lan') {
 				return forwardsLanToAhwlan ? 'extender' : 'none';
-			} else {
+			} else if (ethDHCPNetwork === uci.get('wireless', morseInterfaceName, 'network')) {
 				return 'bridge';
+			} else {
+				return undefined;
 			}
 		};
 
@@ -166,7 +176,6 @@ return wizard.AbstractWizardView.extend({
 			}
 
 			if (isWifiAp) {
-				// TODO: IMO this should be ahwlan.
 				uci.set('wireless', wifiApInterfaceName, 'network', 'lan');
 			}
 
@@ -178,28 +187,53 @@ return wizard.AbstractWizardView.extend({
 
 		// Set 'bridge/ip/gateway' etc. via uci,
 		// based on the selected uplink and traffic mode
-		this.ethIp = null;
 		if (isMeshGate) {
-			if (uplink === 'ethernet' && device_mode_meshgate === 'router') {
-				const { ethIface, halowIface } = nonBridgeMode();
+			if (uplink?.match(/ethernet/) && device_mode_meshgate?.match(/router/)) {
+				// Network
+				const upstreamNetwork = device_mode_meshgate === 'router_firewall' ? 'wan' : 'lan';
+				if (upstreamNetwork === 'wan') {
+					morseuci.ensureNetworkExists('wan');
+					const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes('wan'));
+					uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
+					uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
+					morseuci.getOrCreateForwarding('ahwlan', 'wan');
+				} else {
+					morseuci.getOrCreateForwarding('ahwlan', 'lan', 'mmrouter');
+				}
 
-				uci.set('network', ethIface, 'proto', 'dhcp');
-				morseuci.setupNetworkWithDnsmasq(halowIface, wlanIp);
-				morseuci.getOrCreateForwarding(halowIface, ethIface, 'mmrouter');
+				// Devices
+				uci.set('wireless', morseInterfaceName, 'network', 'ahwlan');
+				if (isMeshAp) {
+					uci.set('wireless', morseMeshApInterfaceName, 'network', 'ahwlan');
+					uci.set('wireless', morseMeshApInterfaceName, 'wds', '1');
+				}
+				if (isWifiAp) {
+					uci.set('wireless', wifiApInterfaceName, 'network', 'ahwlan');
+				}
+				const [_, port] = uplink.split('-');
+				if (port) {
+					morseuci.setNetworkDevices(upstreamNetwork, [port]);
+					morseuci.setNetworkDevices('ahwlan', this.getEthernetPorts().filter(p => p.device !== port).map(p => p.device));
+				} else {
+					morseuci.setNetworkDevices(upstreamNetwork, this.getEthernetPorts().map(p => p.device));
+				}
+
+				// Bridges
+				morseuci.useBridgeIfNeeded(upstreamNetwork);
+				morseuci.useBridgeIfNeeded('ahwlan');
+
+				uci.set('network', upstreamNetwork, 'proto', 'dhcp');
+				morseuci.setupNetworkWithDnsmasq('ahwlan', wlanIp);
 			} else if (uplink === 'none') {
 				const { ethIface, halowIface } = nonBridgeMode();
 
 				// This is a weird overload of the var name
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp, false);
 				morseuci.setupNetworkWithDnsmasq(halowIface, wlanIp, false);
-
-				this.ethIp = lanIp;
-			} else if (uplink === 'ethernet' && device_mode_meshgate === 'bridge') {
+			} else if (uplink?.match(/ethernet/) && device_mode_meshgate === 'bridge') {
 				const iface = bridgeMode();
 
 				uci.set('network', iface, 'proto', 'dhcp');
-
-				this.ethIp = wlanIp;
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
@@ -208,8 +242,6 @@ return wizard.AbstractWizardView.extend({
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);
 				morseuci.getOrCreateForwarding(iface, 'wifi24lan', 'wifi24forward');
-
-				this.ethIp = wlanIp;
 			}
 		} else {
 			if (device_mode_meshpoint === 'extender') { // i.e. router
@@ -218,15 +250,11 @@ return wizard.AbstractWizardView.extend({
 				uci.set('network', halowIface, 'proto', 'dhcp');
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp);
 				morseuci.getOrCreateForwarding(ethIface, halowIface, 'mmextender');
-
-				this.ethIp = lanIp;
 			} else if (device_mode_meshpoint === 'none') {
 				const { ethIface, halowIface } = nonBridgeMode();
 
 				uci.set('network', halowIface, 'proto', 'dhcp');
 				morseuci.setupNetworkWithDnsmasq(ethIface, lanIp, false);
-
-				this.ethIp = lanIp;
 			} else if (device_mode_meshpoint === 'bridge') {
 				uci.set('wireless', morseInterfaceName, 'wds', '1');
 				const iface = bridgeMode();
@@ -456,7 +484,13 @@ return wizard.AbstractWizardView.extend({
 		var bridgeInfoAp = _(`In <b>Bridge</b> mode this device and the HaLow connected devices obtain IP addresses from
 			your current upstream network.`);
 		var routerInfoAp = _(`In <b>Router</b> mode the HaLow connected devices obtain IP addresses from
-			the DHCP server on this device, and this device uses NAT to forward IP traffic.`);
+			the DHCP server on this device, and this device uses NAT to forward IP traffic. <strong>Only use this if you
+			intend to connect to a trusted network</strong>, as this admin interface
+			will be accessible on the upstream network.`);
+		var routerFirewallInfoAp = _(`In <b>Router with Firewall</b> mode the HaLow connected devices obtain IP addresses from
+			the DHCP server on this device, and this device uses NAT to forward IP traffic. The admin interface
+			will be blocked on the network you connect to, which is the normal behaviour for a home router. 
+			Choose this when connecting directly to the internet.`);
 
 		page = this.page(networkSection,
 			_('Upstream Network'),
@@ -483,7 +517,23 @@ return wizard.AbstractWizardView.extend({
 		option.widget = 'radio';
 		option.orientation = 'vertical';
 		option.value('none', _('None'));
-		option.value('ethernet', _('Ethernet'));
+		if (this.getEthernetPorts().length === 1) {
+			option.value('ethernet', _('Ethernet'));
+		} else if (this.getEthernetPorts().length > 1) {
+			const nonDonglePorts = [];
+			for (const port of this.getEthernetPorts()) {
+				if (!port.builtin) {
+					option.value(`ethernet-${port.device}`, `Dongle (${port.device}) - e.g. a USB LTE dongle or tethered phone`);
+				} else {
+					nonDonglePorts.push(port);
+				}
+			}
+
+			// Put the non-dongle ports at the end, as dongle is preferred.
+			for (const port of nonDonglePorts) {
+				option.value(`ethernet-${port.device}`, `Ethernet (${port.device})`);
+			}
+		}
 		if (wifiDeviceName) {
 			option.value('wifi', _('Wi-Fi (2.4 GHz)'));
 		}
@@ -542,22 +592,30 @@ return wizard.AbstractWizardView.extend({
 		}
 
 		option = page.heading(_('Traffic Mode'));
-		option.depends({ uplink: 'ethernet' });
+		option.depends({ uplink: /ethernet/ });
 
 		option = page.option(form.ListValue, 'device_mode_meshgate');
 		option.displayname = _('Bridge/Router');
-		option.depends({ uplink: 'ethernet' });
+		option.depends({ uplink: /ethernet/ });
 		option.rmempty = false;
 		option.retain = true;
 		option.widget = 'radio';
 		option.orientation = 'vertical';
 		option.value('bridge', _('Bridge'));
 		option.value('router', _('Router'));
+		if (this.getEthernetPorts().length > 1) {
+			// Only offer the firewall option if you have multiple ethernet ports
+			// (with a single ethernet port, you're much more likely to get
+			// locked out of the admin interface).
+			option.value('router_firewall', _('Router with Firewall'));
+		}
 		option.onchange = function (ev, sectionId, value) {
 			if (value == 'bridge') {
 				this.page.updateInfoText(bridgeInfoAp, thisWizardView);
 			} else if (value == 'router') {
 				this.page.updateInfoText(routerInfoAp, thisWizardView);
+			} else if (value == 'router_firewall') {
+				this.page.updateInfoText(routerFirewallInfoAp, thisWizardView);
 			}
 			thisWizardView.onchangeOptionUpdateDiagram(this);
 		};
@@ -576,7 +634,6 @@ return wizard.AbstractWizardView.extend({
 		option = page.option(morseui.Slider, 'disabled', _('Enable HaLow Access Point'));
 		option.enabled = '0';
 		option.disabled = '1';
-		option.default = '1';
 		option.rmempty = false;
 		option.retain = true;
 		option.onchange = function () {
@@ -673,7 +730,7 @@ return wizard.AbstractWizardView.extend({
 		option = page.step(_(`
 			Connect this device to your existing network via an Ethernet cable.
 		`));
-		option.depends('network.wizard.uplink', 'ethernet');
+		option.depends('network.wizard.uplink', /ethernet/);
 
 		if (wifiDeviceName) {
 			option = page.step(_(`

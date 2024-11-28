@@ -43,13 +43,13 @@ return wizard.AbstractWizardView.extend({
 	},
 
 	loadWizardOptions() {
-		const {
-			ethInterfaceName,
-		} = wizard.readSectionInfo();
-
 		const ahwlanZone = morseuci.getZoneForNetwork('ahwlan');
 		const lanZone = morseuci.getZoneForNetwork('lan');
 		const forwardsLanToAhwlan = uci.sections('firewall', 'forwarding').some(f => f.src === lanZone && f.dest === ahwlanZone && f.enabled !== '0');
+
+		const {
+			ethStaticNetwork,
+		} = wizard.readEthernetPortInfo(this.getEthernetPorts());
 
 		// If we weren't a mesh point, force choice again.
 		const getDeviceTypeMatter = () => {
@@ -65,7 +65,7 @@ return wizard.AbstractWizardView.extend({
 		};
 
 		const getDeviceModeMatter = () => {
-			if (ethInterfaceName === 'lan') {
+			if (ethStaticNetwork) {
 				return forwardsLanToAhwlan ? 'extender' : 'none';
 			} else {
 				return 'bridge';
@@ -117,15 +117,12 @@ return wizard.AbstractWizardView.extend({
 			uci.set('network', halowIface, 'proto', 'dhcp');
 			morseuci.setupNetworkWithDnsmasq(ethIface, lanIp);
 			morseuci.getOrCreateForwarding(ethIface, halowIface, 'mmextender');
-
-			this.ethIp = lanIp;
 		} else if (device_mode_matter === 'none') {
 			const { ethIface, halowIface } = nonBridgeMode();
 
 			uci.unset('wireless', morseInterfaceName, 'wds');
 			uci.set('network', halowIface, 'proto', 'dhcp');
 			morseuci.setupNetworkWithDnsmasq(ethIface, lanIp, false);
-			this.ethIp = lanIp;
 		} else if (device_mode_matter === 'bridge') {
 			const iface = bridgeMode();
 

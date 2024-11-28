@@ -87,8 +87,6 @@ function readSectionInfo() {
 			break;
 		}
 	}
-	const ethInterfaceName = morseuci.getEthNetwork();
-
 	if (!morseDevice) {
 		throw new WizardConfigError(_('No HaLow radio found'));
 	}
@@ -130,7 +128,6 @@ function readSectionInfo() {
 	}
 
 	return {
-		ethInterfaceName,
 		morseDevice,
 		morseDeviceName,
 		wifiDevice,
@@ -144,6 +141,25 @@ function readSectionInfo() {
 		lanIp,
 		wlanIp,
 	};
+}
+
+function readEthernetPortInfo(ethernetPorts) {
+	let ethStaticNetwork, ethDHCPNetwork, ethDHCPPort;
+
+	for (const network of uci.sections('network', 'interface')) {
+		for (const deviceName of morseuci.getNetworkDevices(network['.name'])) {
+			if (ethernetPorts.some(p => p.device === deviceName)) {
+				if (network.proto === 'static') {
+					ethStaticNetwork = network['.name'];
+				} else if (network.proto === 'dhcp') {
+					ethDHCPNetwork = network['.name'];
+					ethDHCPPort = deviceName;
+				}
+			}
+		}
+	}
+
+	return { ethStaticNetwork, ethDHCPPort, ethDHCPNetwork };
 }
 
 function whitelistFields(conf, section, whitelist) {
@@ -989,6 +1005,7 @@ const AbstractWizardView = view.extend({
 return baseclass.extend({
 	AbstractWizardView,
 	readSectionInfo,
+	readEthernetPortInfo,
 	directUciRpc,
 	resetUci,
 	resetUciNetworkTopology,
