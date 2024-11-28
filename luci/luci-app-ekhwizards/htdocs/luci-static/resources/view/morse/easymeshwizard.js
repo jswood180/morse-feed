@@ -588,14 +588,7 @@ return wizard.AbstractWizardView.extend({
 		page.isActive = () => true;
 		page.enableDiagram();
 
-		// Warn users if ethernet is not going to work (mostly trying to catch initial setup via 10.42.0.1,
-		// though if they're connected in some other way this is still accurate).
-		option = page.message(_(`
-			To access this admin interface after clicking <b>Apply</b>, you will need to find
-			the IP address allocated by your network's DHCP server. If you lose access,
-			see the <a target="_blank" href="%s">User Guide</a> for reset instructions.
-		`).format(L.url('admin', 'help', 'guide')));
-		option.depends('network.wizard.uplink', 'ethernet');
+		option = page.html(() => this.renderIPChangeAlert());
 
 		if (wifiDeviceName) {
 			option = page.step(_(`
@@ -643,13 +636,12 @@ return wizard.AbstractWizardView.extend({
 		// This last page should always be active, as otherwise when initial config is happening
 		// none of the options are visible and it's treated as inactive.
 		page.isActive = () => true;
-		const completion
-			= E('span', { class: 'completion' }, [
-				E('h1', _('Wizard Complete')),
-				E('p', _('Click below to exit the wizard')),
-			]);
 
-		option = page.html(completion);
+		page.html(() => E('span', { class: 'completion' }, [
+			this.renderIPChangeAlert(),
+			E('h1', _('Wizard Complete')),
+			E('p', _('Click below to exit the wizard')),
+		]));
 
 		return map.render();
 	},

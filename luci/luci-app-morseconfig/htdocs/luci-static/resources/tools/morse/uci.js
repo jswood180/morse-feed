@@ -467,6 +467,61 @@ function getFirstNetmask(iface) {
 	return netmask;
 }
 
+/* Combine info from getBuiltinEthernetPorts (i.e. role) with
+ * info from networkDevices (i.e. which will include usb hotplugs).
+ */
+function getEthernetPorts(builtinEthernetPorts, networkDevices) {
+	const ports = {};
+
+	for (const port of builtinEthernetPorts) {
+		ports[port.device] = Object.assign({ builtin: true }, port);
+	}
+
+	for (const device of networkDevices) {
+		if (device.getType() !== 'ethernet' || device.dev.type === 803) {
+			// 803 is the morse monitor interface (usu morse0), which luci picks
+			// up as type ethernet (fallback).
+			continue;
+		}
+
+		// If it's not in the builtin ports, consider it to have a role of 'wan'.
+		ports[device.getName()] ??= { builtin: false, device: device.getName(), role: 'wan' };
+		ports[device.getName()].deviceinfo = device;
+	}
+
+	return Object.values(ports);
+}
+
+/* Return a static IP associated with an ethernet port
+ * (prefer builtin ports over other detected ones).
+ */
+function getEthernetStaticIp(ports) {
+	const portsObj = {};
+	for (const port of ports) {
+		portsObj[port.device] = port;
+	}
+
+	const builtinIps = [];
+	const externalIps = [];
+	for (const network of uci.sections('network', 'interface')) {
+		if (network.proto === 'static') {
+			for (const deviceName of getNetworkDevices(network['.name'])) {
+				if (portsObj[deviceName]) {
+					(portsObj[deviceName].builtin ? builtinIps : externalIps).push(getFirstIpaddr(network['.name']));
+				}
+			}
+		}
+	}
+
+	if (builtinIps.length > 0) {
+		return builtinIps[0];
+	} else if (externalIps.length > 0) {
+		return externalIps[0];
+	} else {
+		return null;
+	}
+}
+
 return baseclass.extend({
 	getZoneForNetwork,
 	getOrCreateZone,
@@ -488,4 +543,6 @@ return baseclass.extend({
 	getFakeMorseMAC,
 	getFirstIpaddr,
 	getFirstNetmask,
+	getEthernetPorts,
+	getEthernetStaticIp,
 });

@@ -215,25 +215,6 @@ const SimpleForwardSelect = form.ListValue.extend({
 	},
 });
 
-/* DummyValue that one can easily ask to rerender.
- *
- * Note that using renderUpdate() is a bad idea on a normal dummy value, as it
- * will try to use the formvalue when re-rendering (and since DummyValue
- * is a bit of a hack where we override cfgvalue to insert the HTML/text,
- * formvalue will not work out). NB overriding formvalue won't work
- * because LuCI will call its own isEqual on it and setting it to HTML elements
- * introduces cyclic references.
- */
-const DynamicDummyValue = form.DummyValue.extend({
-	__name__: 'CBI.DynamicDummyValue',
-
-	dynamic: true,
-
-	renderUpdate(sectionId) {
-		return form.DummyValue.prototype.renderUpdate.call(this, sectionId, this.cfgvalue(sectionId));
-	},
-});
-
 /* Encryption list that depends on the device type and mode.
  *
  * The standard luci encryption selection (in network/wireless):
@@ -442,12 +423,12 @@ return view.extend({
 		]);
 	},
 
-	async render([hasQRCode, ethernetPorts]) {
+	async render([hasQRCode, builtinEthernetPorts]) {
 		this.hasQRCode = hasQRCode;
-		this.ethernetPorts = ethernetPorts;
 		// The actual load is performed by 'flushCache' above; these don't cause network requests.
 		// Note that if we did them in parallel, we would duplicate requests (due to what IMO
 		// is a bug in the initNetworkState caching layer).
+		this.ethernetPorts = morseuci.getEthernetPorts(builtinEthernetPorts, await network.getDevices());
 		this.wifiDevices = (await network.getWifiDevices()).reduce((o, d) => (o[d.getName()] = d, o), {});
 		this.wifiNetworks = (await network.getWifiNetworks()).reduce((o, n) => (o[n.getName()] = n, o), {});
 
@@ -506,10 +487,10 @@ return view.extend({
 		}
 
 		const diagram = E('morse-config-diagram');
-		this.attachDynamicUpdateHandlers(diagram, ethernetPorts, hasWireless ? [networkMap, wirelessMap] : [networkMap]);
+		this.attachDynamicUpdateHandlers(diagram, this.ethernetPorts, hasWireless ? [networkMap, wirelessMap] : [networkMap]);
 
 		// This is actually a promise, but we can do it along with the render.
-		diagram.updateFrom(uci, ethernetPorts);
+		diagram.updateFrom(uci, this.ethernetPorts);
 
 		const elements = [
 			E('div', { class: 'cbi-section' }, [
@@ -830,7 +811,7 @@ return view.extend({
 		};
 
 		if (hasWireless) {
-			option = section.option(DynamicDummyValue, '_wifi_interfaces', _('Wireless'));
+			option = section.option(morseui.DynamicDummyValue, '_wifi_interfaces', _('Wireless'));
 			option.rawhtml = true;
 			option.cfgvalue = (sectionId) => {
 				const wirelessDevices = {};
@@ -874,8 +855,10 @@ return view.extend({
 		};
 
 		const availableDevices = new Set(this.ethernetPorts.map(p => p.device));
-		// Add any other devices that aren't in the port list to avoid
-		// trashing complex config.
+
+		// Add any other devices that aren't currently available to avoid
+		// accidentally mutating config (e.g. for a usb dongle that's not
+		// currently plugged in).
 		for (const netIface of uci.sections('network', 'interface')) {
 			if (isNormalNetworkIface(netIface)) {
 				for (const dev of morseuci.getNetworkDevices(netIface['.name'])) {
@@ -883,6 +866,7 @@ return view.extend({
 				}
 			}
 		}
+
 		for (const dev of availableDevices) {
 			option.value(dev, dev);
 		}

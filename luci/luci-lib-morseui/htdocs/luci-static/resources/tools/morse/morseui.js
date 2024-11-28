@@ -769,10 +769,30 @@ var CBISSIDListScan = form.Value.extend({
 	},
 });
 
+/* DummyValue that one can easily ask to rerender.
+ *
+ * Note that using renderUpdate() is a bad idea on a normal dummy value, as it
+ * will try to use the formvalue when re-rendering (and since DummyValue
+ * is a bit of a hack where we override cfgvalue to insert the HTML/text,
+ * formvalue will not work out). NB overriding formvalue won't work
+ * because LuCI will call its own isEqual on it and setting it to HTML elements
+ * introduces cyclic references.
+ */
+const CBIDynamicDummyValue = form.DummyValue.extend({
+	__name__: 'CBI.DynamicDummyValue',
+
+	dynamic: true,
+
+	renderUpdate(sectionId) {
+		return form.DummyValue.prototype.renderUpdate.call(this, sectionId, this.cfgvalue(sectionId));
+	},
+});
+
 return baseclass.extend({
 	EditableList: CBIEditableList,
 	SSIDListScan: CBISSIDListScan,
 	StandardList: CBIStandardList,
+	DynamicDummyValue: CBIDynamicDummyValue,
 	Slider: CBISlider,
 	Toggle: CBIToggle,
 	UISlider,

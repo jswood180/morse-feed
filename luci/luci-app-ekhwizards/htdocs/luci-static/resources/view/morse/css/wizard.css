@@ -108,32 +108,6 @@ button.close, button.close:focus, button.close:active, button.close:hover {
 	background-color: inherit;
 }
 
-/* Used for our dodgy MessageValue steps.
- */
-.cbi-value.cbi-message-value {
-	padding: 0 1rem;
-	margin-top: 0;
-	margin-left: 0;
-	margin-bottom: 1rem;
-	margin-right: 0;
-
-	.alert-message {
-		margin-top: 1rem;
-		margin-left: 0;
-		margin-bottom: 0;
-		margin-right: 0;
-	}
-
-	ul {
-		margin: 0 1rem;
-	}
-
-	li {
-		color: var(--text-color-high);
-		list-style: disc;
-	}
-}
-
 /* Utility class which allows us to hide sections based on
  * whether we're currently showing the section.
  * We avoid 'hidden', because this is meaningful for LuCI's dependency calculations.
@@ -189,10 +163,6 @@ button.close, button.close:focus, button.close:active, button.close:hover {
 
 	p {
 		font-size: 1.2rem;
-	}
-
-	* {
-		padding: 20px;
 	}
 }
 

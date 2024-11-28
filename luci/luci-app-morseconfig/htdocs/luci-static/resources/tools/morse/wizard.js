@@ -1,12 +1,14 @@
 'use strict';
-/* globals baseclass configDiagram form morseuci rpc uci ui view */
+/* globals baseclass configDiagram form morseuci morseui network rpc uci ui view */
 'require baseclass';
 'require view';
 'require form';
 'require uci';
 'require ui';
+'require network';
 'require rpc';
 'require tools.morse.uci as morseuci';
+'require tools.morse.morseui as morseui';
 'require custom-elements.morse-config-diagram as configDiagram';
 
 const DEFAULT_LAN_IP = '10.42.0.1';
@@ -52,88 +54,6 @@ const directUciRpc = {
 	commit: callUciCommit,
 	apply: callUciApply,
 };
-
-/**
- * @class HTMLValue
- * @memberof LuCI.form
- * @augments LuCI.form.Value
- * @hideconstructor
- * @classdesc
- *
- * The `HTMLValue` widget lets you use an html element as an option.
- * This makes it easy to insert miscellaneous information between other
- * options, including information with dependencies.
- *
- * Note that it doesn't work to simply append additional children to a section
- * element because an AbstractSection assumes all children are options.
- *
- * @param {LuCI.form.Map|LuCI.form.JSONMap} form
- * The configuration form this section is added to. It is automatically passed
- * by [option()]{@link LuCI.form.AbstractSection#option} or
- * [taboption()]{@link LuCI.form.AbstractSection#taboption} when adding the
- * option to the section.
- *
- * @param {LuCI.form.AbstractSection} section
- * The configuration section this option is added to. It is automatically passed
- * by [option()]{@link LuCI.form.AbstractSection#option} or
- * [taboption()]{@link LuCI.form.AbstractSection#taboption} when adding the
- * option to the section.
- *
- * @param {string} option
- * The internal name of the option element holding the section. Since a section
- * container element does not read or write any configuration itself, the name
- * is only used internally and does not need to relate to any underlying UCI
- * option name.
- *
- * @param {HTMLElement} element
- * The element you wish to insert as a fake option.
- *
- * @param {...*} [class_args]
- * All further arguments are passed as-is to the subclass constructor. Refer
- * to the corresponding class constructor documentations for details.
- */
-var HTMLValue = form.Value.extend(/** @lends LuCI.form.Value.prototype */ {
-	__init__: function (map, section, option, element /* , ... */) {
-		this.super('__init__', this.varargs(arguments, 4, map, section, option));
-
-		this.element = element;
-	},
-
-	render: async function (..._args) {
-		const el = await this.super('render', arguments);
-		el.classList.add('cbi-message-value');
-		return el;
-	},
-
-	renderWidget: function (section_id) {
-		const el = this.element.cloneNode(true);
-		el.id = this.cbid(section_id);
-		return el;
-	},
-
-	/** Disable option behaviour relating to actual values (which we don't have). */
-
-	/** @override */
-	load: function (_section_id) { },
-
-	/** @override */
-	parse: async function (_section_id) { },
-
-	/** @override */
-	value: function () { },
-
-	/** @override */
-	write: function () { },
-
-	/** @override */
-	remove: function () { },
-
-	/** @override */
-	cfgvalue: function () { return null; },
-
-	/** @override */
-	formvalue: function () { return null; },
-});
 
 class WizardConfigError extends Error { }
 
@@ -428,6 +348,14 @@ class WizardPage {
 			} else {
 				console.error('Internal error - missing cbid:', option.cbid(option.section.section));
 			}
+
+			// At the moment, we only update 'dynamic' options when shown on a page
+			// (since they're currently only used for the final messages).
+			// If it was important to do it in a general way, we could copy the approach
+			// from config.js (attachDynamicUpdateHandlers).
+			if (option.dynamic) {
+				option.renderUpdate(option.section.section);
+			}
 		}
 	}
 
@@ -458,7 +386,18 @@ class WizardPage {
 	}
 
 	html(html) {
-		return this.option(HTMLValue, `__dummy_${this.wpId}-${this.options.length}`, html);
+		// This just has to be distinct.
+		const fakeId = `__dummy_${this.wpId}-${this.options.length}`;
+		let val;
+		if (typeof html === 'function') {
+			val = this.option(morseui.DynamicDummyValue, fakeId);
+			val.cfgvalue = html;
+		} else {
+			val = this.option(form.DummyValue, fakeId);
+			val.cfgvalue = _ => html;
+		}
+		val.rawhtml = true;
+		return val;
 	}
 
 	message(contents, messageType = 'warning') {
@@ -466,7 +405,7 @@ class WizardPage {
 	}
 
 	step(contents) {
-		return this.html(E('ul', {}, E('li', {}, contents)));
+		return this.html(E('div', { class: 'wizard-step' }, E('span', {}, ['· ', contents])));
 	}
 
 	heading(contents) {
@@ -509,14 +448,6 @@ const AbstractWizardView = view.extend({
 		return this.super('__init__', this.varargs(arguments, 3));
 	},
 
-	/* Override if you're doing something more complicated.
-	 * Note that returning 'null' will mean that the exit
-	 * buttons will be disabled.
-	 */
-	getRedirectPage() {
-		return L.url();
-	},
-
 	/* When an option relevant to the diagram changes, call this
 	 * from the onchange handler.
 	 *
@@ -552,6 +483,10 @@ const AbstractWizardView = view.extend({
 		return this.ethernetPorts;
 	},
 
+	getEthernetStaticIpOriginal() {
+		return this.ethernetStaticIpOriginal;
+	},
+
 	updateDiagram(page) {
 		if (!page.diagramArgs) {
 			// i.e. if page doesn't have diagram enabled, nothing to do here.
@@ -578,23 +513,19 @@ const AbstractWizardView = view.extend({
 
 	exit() {
 		if (this.finished) {
-			// If we're finished, we should have reset the homepage.
-			const redirectPage = this.getRedirectPage();
-			if (redirectPage) {
-				window.location = redirectPage;
+			// If we're finished, we should have reset the homepage so we can redirect to there.
+			const homepage = L.url();
+			const originalIp = this.getEthernetStaticIpOriginal();
+			const newIp = morseuci.getEthernetStaticIp(this.getEthernetPorts());
+
+			// TODO: See APP-2041 for improving IP change logic.
+			if (newIp && window.location.hostname === originalIp && originalIp !== newIp) {
+				// Not explicitly setting homepage forces the login redirect to happen.
+				// If we immediately send to the correct page, the sysauth_http cookie is
+				// not included.
+				window.location.href = `${window.location.protocol}//${newIp}`;
 			} else {
-				const message = this.ethIp === null
-					? _(`It looks like the device has been configured as a DHCP client. Cannot redirect!`)
-					: _(`Oops, the URL <a href=http://%s>%s</a> doesn't appear to be reachable. Please check your network configuration and try again.`).format(this.ethIp);
-				ui.showModal(_('Network changes detected!'), [
-					E('p', message),
-					E('div', { class: 'right' }, [
-						E('button', {
-							class: 'btn',
-							click: ui.hideModal,
-						}, _('Close', 'User action to close a dialog box')), ' ',
-					]),
-				]);
+				window.location = homepage;
 			}
 			return;
 		}
@@ -632,6 +563,41 @@ const AbstractWizardView = view.extend({
 			Configuration incompatible with config wizard detected (%s). If you wish
 			to use the wizard, you should <a href="%s">reset or reflash your device</a>.
 		`).format(errorMessage, L.url('admin', 'system', 'flash')));
+	},
+
+	renderIPChangeAlert() {
+		const originalStaticIp = this.getEthernetStaticIpOriginal();
+		const staticIp = morseuci.getEthernetStaticIp(this.getEthernetPorts());
+		let text;
+		if (originalStaticIp && !staticIp) {
+			text = _(`
+				The IP associated with your ethernet port(s) will now be obtained via DHCP.
+				To access this admin interface after clicking <b>Apply</b>, you should find
+				the IP address allocated by your network's DHCP server, and enter the
+				new location in your browser.
+			`);
+		} else if (originalStaticIp && staticIp && staticIp !== originalStaticIp) {
+			text = _(`
+				The static IPv4 address of this device is changing! It was previously
+				%s, and will now be %s. To access this admin interface, you may need to
+				disconnect and reconnect, then go to the new IP.
+			`).format(this.getEthernetStaticIpOriginal(), staticIp);
+		} else if (!originalStaticIp && staticIp) {
+			text = _(`
+				This device has a new static IPv4 address, %s! 
+				To access this admin interface over ethernet, you may need to
+				disconnect and reconnect, then go to the new IP.
+			`).format(staticIp);
+		}
+
+		if (text) {
+			return E('div', { class: `alert-message warning` }, text + _(`
+				If you lose access,
+				see the <a target="_blank" href="%s">User Guide</a> for reset instructions.
+			`).format(L.url('admin', 'help', 'guide')));
+		} else {
+			return E('div');
+		}
 	},
 
 	async render(loadPagesResults) {
@@ -696,8 +662,9 @@ const AbstractWizardView = view.extend({
 		const criticalConfig = ['wireless', 'network', 'firewall', 'dhcp', 'system'];
 		criticalConfig.push(...this.getExtraConfigFiles());
 
-		await Promise.all([
-			callGetBuiltinEthernetPorts().then(ports => this.ethernetPorts = ports),
+		const [builtinEthernetPorts, networkDevices] = await Promise.all([
+			callGetBuiltinEthernetPorts(),
+			network.getDevices(),
 			uci.load(['luci']).catch((e) => {
 				// If we don't even have luci, we won't be able to remove our homepage override!
 				// We load this one separately so other breakages don't interfere with this,
@@ -720,6 +687,9 @@ const AbstractWizardView = view.extend({
 			configDiagram.loadTemplate(),
 		]);
 
+		this.ethernetPorts = morseuci.getEthernetPorts(builtinEthernetPorts, networkDevices);
+		this.ethernetStaticIpOriginal = morseuci.getEthernetStaticIp(this.ethernetPorts);
+
 		if (this.configLoadError) {
 			return;
 		}
@@ -730,6 +700,7 @@ const AbstractWizardView = view.extend({
 			return result;
 		} catch (e) {
 			this.configLoadError = e;
+			console.error(e);
 		}
 	},
 

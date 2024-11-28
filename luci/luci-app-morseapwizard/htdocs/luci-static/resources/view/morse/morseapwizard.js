@@ -330,7 +330,7 @@ return view.extend({
 		return [networkDevices, ethernetPorts];
 	},
 
-	async render([networkDevices, ethernetPorts]) {
+	async render([networkDevices, builtinEthernetPorts]) {
 		if (this.errorMessage) {
 			return [
 				E('h2', _('Wizard')),
@@ -339,7 +339,7 @@ return view.extend({
 		}
 
 		this.bridgeMAC = morseuci.getFakeMorseMAC(networkDevices) ?? morseuci.getRandomMAC();
-		this.ethernetPorts = ethernetPorts;
+		this.ethernetPorts = morseuci.getEthernetPorts(builtinEthernetPorts, networkDevices);
 		this.data = {
 			wizard: {
 				device_mode: this.getDeviceMode(),
@@ -349,7 +349,7 @@ return view.extend({
 		};
 
 		this.diagram = E('morse-config-diagram');
-		this.diagram.updateFrom(uci, ethernetPorts);
+		this.diagram.updateFrom(uci, this.ethernetPorts);
 		this.infobox = E('div', { class: 'alert-message notice' });
 		this.updateInfoBox();
 
