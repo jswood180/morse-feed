@@ -5,6 +5,13 @@
 	--box-shadow-highlight: #a0a2a4;
 }
 
+@media screen and (max-width: 450px) {
+	/* hide logo if screen not wide enough to display */
+	header .brand {
+		display: none;
+	}
+}
+
 header .close {
 	padding: 20px !important;
 	height: 30px;
@@ -44,6 +51,7 @@ header .close:hover {
 	margin-bottom: 0px;
 	height: var(--bottom-nav-height);
 	background-color: white;
+	box-shadow: 0 -2px 4px rgb(180, 180, 180, 0.5);
 }
 
 .cbi-page-actions .container {
@@ -53,6 +61,7 @@ header .close:hover {
 	margin: auto !important;
 	float: none !important;
 	padding: 10px;
+	max-width: var(--max-content-width);
 }
 
 .cbi-page-actions-flex {
@@ -135,7 +144,7 @@ button.close, button.close:focus, button.close:active, button.close:hover {
 
 /* Remove borders in mobile view, since we separate out with visibility.
  */
- @media screen and (max-width: 600px) {
+@media screen and (max-width: 600px) {
 	.cbi-section .cbi-value {
 		border-bottom: 0px;
 	}
