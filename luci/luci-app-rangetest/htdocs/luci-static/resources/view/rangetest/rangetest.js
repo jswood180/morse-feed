@@ -169,7 +169,8 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	const iperf3PollInterval = 2;
 
 	const nSubtests = protocols.length * directions.length;
-	const progressIncrement = (iperf3PollInterval / (iperf3TestTime * nSubtests)) * 100;
+	const maxSubtestIncrements = iperf3TestTime / iperf3PollInterval;
+	const percentPerIncrement = 100 / (maxSubtestIncrements * nSubtests);
 	testProgressBar.show();
 	testProgressBar.reset('Beginning...');
 
@@ -183,7 +184,7 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 
 			const iperf3RemoteResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
 			const iperf3LocalResponse = await backgroundIperf3Client(remoteIp, (protocol === 'udp'), (direction === 'receive'), iperf3TestTime);
-			const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, progressIncrement, testProgressBar, cancelPromise);
+			const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, maxSubtestIncrements, percentPerIncrement, testProgressBar, cancelPromise);
 			const iperf3RemoteResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3RemoteResponse.id);
 
 			testResults['local']['iperf3'][protocol][direction]['end'] = iperf3LocalResults?.end;
@@ -263,7 +264,7 @@ function formatFilenameDatetime(date) {
 		+ `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 }
 
-async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, progressIncrement, testProgressBar, cancelPromise) {
+async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, remainingIncrements, percentPerIncrement, testProgressBar, cancelPromise) {
 	// 30% margin of safety
 	const timeout = (duration * 1300);
 	const startTime = Date.now();
@@ -283,8 +284,11 @@ async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, prog
 			throw new Error(`Request to local device failed with UBUS code: ${clientPollResponse}`);
 		} else if (Object.keys(clientPollResponse).length > 0) {
 			completed = true;
-		} else {
-			testProgressBar.increment(progressIncrement);
+		}
+
+		if (remainingIncrements > 0) {
+			remainingIncrements--;
+			testProgressBar.increment(percentPerIncrement);
 		}
 	}
 
