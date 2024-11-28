@@ -357,11 +357,14 @@ function getNetworkWifiIfaces(networkSectionId) {
 function getNetworkDevices(sectionId) {
 	const device = uci.get('network', sectionId, 'device');
 	const bridge = uci.sections('network', 'device').find(s => s.name === device && s.type === 'bridge');
+	let res;
 	if (bridge) {
-		return bridge.ports ?? [];
+		res = bridge.ports;
 	} else {
-		return device ? [device] : [];
+		res = device;
 	}
+
+	return res ? L.toArray(res) : [];
 }
 
 function setNetworkDevices(sectionId, devices) {
