@@ -619,6 +619,9 @@ function getBestEncryption(result) {
 	const is_sae = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
 		return a == 'sae';
 	}).length > 0);
+	const is_owe = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).filter(function (a) {
+		return a == 'owe';
+	}).length > 0);
 
 	if (is_sae) {
 		return 'sae';
@@ -628,6 +631,8 @@ function getBestEncryption(result) {
 		} else {
 			return 'psk';
 		}
+	} else if (is_owe) {
+		return 'owe';
 	} else {
 		return 'none';
 	}
