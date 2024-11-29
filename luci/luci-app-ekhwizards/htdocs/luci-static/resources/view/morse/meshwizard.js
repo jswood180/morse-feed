@@ -314,6 +314,7 @@ return wizard.AbstractWizardView.extend({
 		}
 		uci.set('wireless', morseMeshApInterfaceName, 'device', morseDeviceName);
 		uci.set('wireless', morseMeshApInterfaceName, 'mode', 'ap');
+		uci.set('wireless', morseMeshApInterfaceName, 'encryption', 'sae');
 
 		const initialMorseMode = uci.get('wireless', morseInterfaceName, 'mode');
 		if (initialMorseMode !== 'mesh') {
@@ -401,10 +402,6 @@ return wizard.AbstractWizardView.extend({
 
 		option = page.option(form.Value, 'key', _('Mesh Passphrase'));
 		option.datatype = 'wpakey';
-		option.write = function (sectionId, value) {
-			this.map.data.set(this.map.config, sectionId, 'encryption', 'sae');
-			this.super('write', [sectionId, value]);
-		};
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
@@ -652,10 +649,6 @@ return wizard.AbstractWizardView.extend({
 		option.password = true;
 		option.rmempty = false;
 		option.retain = true;
-		option.write = function (sectionId, value) {
-			this.map.data.set(this.map.config, sectionId, 'encryption', 'sae');
-			this.super('write', [sectionId, value]);
-		};
 
 		/*****************************************************************************/
 
