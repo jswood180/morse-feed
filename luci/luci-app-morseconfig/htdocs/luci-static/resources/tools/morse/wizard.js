@@ -285,6 +285,12 @@ function resetUciNetworkTopology() {
 		uci.set('firewall', forwarding['.name'], 'enabled', '0');
 	}
 
+	// Remove any masquerade/mtu_fix.
+	for (const zone of uci.sections('firewall', 'zone')) {
+		uci.unset('firewall', zone['.name'], 'mtu_fix');
+		uci.unset('firewall', zone['.name'], 'masq');
+	}
+
 	// Ignore all dhcp range sections (effectively disabling dhcp on all interfaces).
 	for (const dhcp of uci.sections('dhcp', 'dhcp')) {
 		// We keep the basic ip ranges, though. This means that wizards

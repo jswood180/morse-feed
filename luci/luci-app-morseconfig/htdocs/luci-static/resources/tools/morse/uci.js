@@ -67,6 +67,12 @@ function getOrCreateForwarding(srcZone, destZone, name = undefined) {
 	}
 
 	// Now it seems like the user has mutated something.
+
+	// Make sure that the target has an appropriate setup for NAT.
+	const zoneSection = uci.sections('firewall', 'zone').find(z => z['name'] === destZone);
+	uci.set('firewall', zoneSection['.name'], 'mtu_fix', '1');
+	uci.set('firewall', zoneSection['.name'], 'masq', '1');
+
 	// Disable any other forwarding from this src (our dropdown only allows one).
 	// Ideally we would like to delete here, but for now to avoid destroying
 	// the default mmrouter/mmextender forwarding rules, we set enabled=0
@@ -108,7 +114,6 @@ function getOrCreateZone(networkSectionId) {
 	uci.set('firewall', proposedName, 'input', 'ACCEPT');
 	uci.set('firewall', proposedName, 'output', 'ACCEPT');
 	uci.set('firewall', proposedName, 'forward', 'ACCEPT');
-	uci.set('firewall', proposedName, 'masq', '1');
 
 	return proposedName;
 }
@@ -394,8 +399,8 @@ function setupNetworkWithDnsmasq(sectionId, ip, uplink = true) {
  * if it doesn't already exist.
  *
  * local: Add a 'local' network to specific configurations, similar to OpenWrt's 'lan'.
- * It is a purely semantic label. At the moment it is just telling umdns to include
- * the new network in the list of ones which it listens to.
+ * It is a purely semantic label, indicating that no firewall/restrictions should be
+ * applied.
  *
  * primaryLocal: Identify the singular primary local network in specific configurations.
  * It is currently only used to identify the interface for camera-onvif-server.
@@ -405,19 +410,33 @@ function ensureNetworkExists(sectionId, { local, primaryLocal } = {}) {
 		uci.add('network', 'interface', sectionId);
 	}
 
+	getOrCreateZone(sectionId);
+	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes('wan'));
+
+	let umdnsNetworkList = L.toArray(uci.get_first('umdns', 'umdns', 'network'));
 	if (local) {
-		let umdnsNetworkList = uci.get_first('umdns', 'umdns', 'network');
-		if (Array.isArray(umdnsNetworkList) && !umdnsNetworkList.includes(sectionId)) {
+		uci.set('firewall', zoneSection['.name'], 'input', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'forward', 'ACCEPT');
+
+		if (!umdnsNetworkList.includes(sectionId)) {
 			umdnsNetworkList.push(sectionId);
 			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList);
+		}
+	} else {
+		uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
+		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
+
+		if (umdnsNetworkList.includes(sectionId)) {
+			umdnsNetworkList = umdnsNetworkList.filter(n => n !== sectionId);
+			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList.length > 0 ? umdnsNetworkList : null);
 		}
 	}
 
 	if (primaryLocal) {
 		uci.set('camera-onvif-server', 'rpicamera', 'interface', sectionId);
 	}
-
-	getOrCreateZone(sectionId);
 }
 
 /* Get the first ipaddr/netmask for an interface from UCI.

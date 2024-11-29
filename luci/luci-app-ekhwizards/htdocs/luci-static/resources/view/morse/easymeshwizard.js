@@ -209,9 +209,6 @@ return wizard.AbstractWizardView.extend({
 
 				if (upstreamNetwork === 'wan') {
 					morseuci.ensureNetworkExists('wan');
-					const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes('wan'));
-					uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
-					uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
 					morseuci.getOrCreateForwarding('ahwlan', 'wan');
 				} else {
 					morseuci.getOrCreateForwarding('ahwlan', 'lan', 'mmrouter');
