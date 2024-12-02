@@ -643,7 +643,13 @@ morse_iface_bringup() {
 				iw dev "$ifname" set 4addr off
 			fi
 
-			set_default powersave 1
+			# Disable powersave for Morse USB mode as a workaround for APP-3745,
+			# 325b is the Vendor ID for Morse USB MM8108
+			if grep -i '325b' /sys/kernel/debug/usb/devices ; then
+				set_default powersave 0
+			else
+				set_default powersave 1
+			fi
 			[ "$powersave" -gt 0 ] && powersave="on" || powersave="off"
 			iw dev "$ifname" set power_save "$powersave"
 			ifconfig "$ifname" hw ether $macaddr
