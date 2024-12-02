@@ -136,12 +136,6 @@ build_morse_mod_params(){
 	for_each_interface "ap" check_cac
 	[ -n "$enable_cac" ] && MOD_PARAMS="$MOD_PARAMS enable_cac=$enable_cac"
 
-	# Disable powersave for Morse USB mode as a workaround for APP-3745,
-	# 325b is the Vendor ID for Morse USB MM8108
-	if grep -i '325b' /sys/kernel/debug/usb/devices ; then
-		MOD_PARAMS="$MOD_PARAMS enable_ps=0"
-	fi
-
 	# Get the last three octets of the eth0 MAC address
 	# to use as the default HaLow MAC address
 	local ETH0_MAC_SUFFIX=`cat /sys/class/net/eth0/address | cut -d: -f4-`
