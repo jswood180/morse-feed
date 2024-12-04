@@ -110,16 +110,20 @@ var RemoteRpcClass = rpc.constructor.extend({
 		return this.__call('get_background', { id: id });
 	},
 
-	iwStationDump: async function (interfaceName) {
-		return this.__call('iw_station_dump', { interface: interfaceName });
+	iwStationDump: async function () {
+		return this.__call('iw_station_dump', {});
 	},
 
-	morseCliStatsReset: async function (interfaceName) {
-		return this.__call('morse_cli_stats_reset', { interface: interfaceName });
+	morseCliStatsReset: async function () {
+		return this.__call('morse_cli_stats_reset', {});
 	},
 
-	morseCliStats: async function (interfaceName) {
-		return this.__call('morse_cli_stats', { interface: interfaceName });
+	morseCliStats: async function () {
+		return this.__call('morse_cli_stats', {});
+	},
+
+	ipLink: async function () {
+		return this.__call('ip_link', {});
 	},
 
 	/**

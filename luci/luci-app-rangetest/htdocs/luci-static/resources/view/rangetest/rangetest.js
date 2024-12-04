@@ -49,45 +49,62 @@ const getBackground = rpc.declare({
 const iwStationDump = rpc.declare({
 	object: 'rangetest',
 	method: 'iw_station_dump',
-	params: ['interface'],
 });
 
 const morseCliStatsReset = rpc.declare({
 	object: 'rangetest',
 	method: 'morse_cli_stats_reset',
-	params: ['interface'],
 });
 
 const morseCliStats = rpc.declare({
 	object: 'rangetest',
 	method: 'morse_cli_stats',
-	params: ['interface'],
 });
 
 const morseCliChannel = rpc.declare({
 	object: 'rangetest',
 	method: 'morse_cli_channel',
-	params: ['interface'],
 });
 
-const iwinfo = rpc.declare({
+const ipLink = rpc.declare({
+	object: 'rangetest',
+	method: 'ip_link',
+});
+
+const iwinfoInfo = rpc.declare({
 	object: 'iwinfo',
 	method: 'info',
 	params: ['device'],
 });
 
 let availableRemoteDevices = {};
+
 const iperf3ResultsTemplate = {
 	iperf3: {
 		udp: { receive: {}, send: {} },
 		tcp: { receive: {}, send: {} },
 	},
 };
+
 const testResultsTemplate = {
 	id: 0,
-	timestamp: '-',
-	local: { ...iperf3ResultsTemplate },
-	remote: { ...iperf3ResultsTemplate },
+	timestamp: '',
+	local: {
+		morseCliChannel: {},
+		morseCliStats: {},
+		iwStationDump: {},
+		ipLink: {},
+		iwinfoInfo: {},
+		connectedInterface: '',
+		...iperf3ResultsTemplate,
+	},
+	remote: {
+		morseCliStats: {},
+		iwStationDump: {},
+		ipLink: {},
+		connectedInterface: '',
+		...iperf3ResultsTemplate,
+	},
 };
 
 /**
@@ -140,6 +157,74 @@ function getDistanceBetweenDecimalDegreesCoordinates(lat1, lon1, lat2, lon2) {
 	return d;
 }
 
+async function setupStatistics(testResults, remoteRangetestDevice) {
+	await Promise.all([
+		morseCliStatsReset(),
+		remoteRangetestDevice.remoteRpc.morseCliStatsReset(),
+	]);
+}
+
+/**
+ * Identify the wireless network interfaces being used in the test by correlating MAC addresses between
+ * the output of an `ip -j link show <dev>` command on one device and a `iw <dev> station dump` on another.
+ *
+ * This function is useful for inferring which interface (might be) being used to communicate
+ * with the remote DUT so that the correct statistics for that direct connection
+ * can be identified i.e. RSSI.
+ *
+ * This function will fail in cases where the connection is indirect.
+ */
+function identifyConnectedInterfaces(ipLinkOutput, stationDumpOutput) {
+	for (const ipLinkInterface in ipLinkOutput) {
+		const macAddress = ipLinkOutput[ipLinkInterface]?.address;
+		for (const stationDumpInterface in stationDumpOutput) {
+			if (macAddress && stationDumpOutput[stationDumpInterface].includes(macAddress)) {
+				return [ipLinkInterface, stationDumpInterface];
+			}
+		}
+	}
+	return null;
+}
+
+async function collectStatistics(testResults, remoteRangetestDevice) {
+	[
+		testResults.local.morseCliChannel,
+		testResults.local.morseCliStats,
+		testResults.remote.morseCliStats,
+		testResults.local.iwStationDump,
+		testResults.remote.iwStationDump,
+		testResults.local.ipLink,
+		testResults.remote.ipLink,
+	] = await Promise.all([
+		morseCliChannel(),
+		morseCliStats(),
+		remoteRangetestDevice.remoteRpc.morseCliStats(),
+		iwStationDump(),
+		remoteRangetestDevice.remoteRpc.iwStationDump(),
+		ipLink(),
+		remoteRangetestDevice.remoteRpc.ipLink(),
+	]);
+
+	let localInterface, remoteInterface;
+	let connectedInterfaces = identifyConnectedInterfaces(testResults.local.ipLink, testResults.remote.iwStationDump);
+	if (connectedInterfaces) {
+		[localInterface, remoteInterface] = connectedInterfaces;
+		testResults.remote.connectedInterface = remoteInterface;
+		testResults.local.connectedInterface = localInterface;
+		testResults.local.iwinfoInfo = await iwinfoInfo(localInterface);
+		return;
+	}
+
+	connectedInterfaces = identifyConnectedInterfaces(testResults.remote.ipLink, testResults.local.iwStationDump);
+	if (connectedInterfaces) {
+		[remoteInterface, localInterface] = connectedInterfaces;
+		testResults.remote.connectedInterface = remoteInterface;
+		testResults.local.connectedInterface = localInterface;
+		testResults.local.iwinfoInfo = await iwinfoInfo(localInterface);
+		return;
+	}
+}
+
 /* Manages the core rangetest functionality here.
  *
  * This functionality should eventually be transferred to the backend.
@@ -153,7 +238,6 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 		basic: {
 			remoteDeviceInfo: {
 				ipv4: [remoteIp],
-				iface: interfaceName,
 			},
 			remoteDevicePassword: remotePassword,
 		},
@@ -174,9 +258,7 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 	testProgressBar.show();
 	testProgressBar.reset('Beginning...');
 
-	testResults['local']['iwinfo'] = await iwinfo(interfaceName);
-	await remoteRangetestDevice.remoteRpc.morseCliStatsReset(interfaceName);
-	await morseCliStatsReset(interfaceName);
+	await setupStatistics(testResults, remoteRangetestDevice);
 
 	for (const protocol of protocols) {
 		for (const direction of directions) {
@@ -192,17 +274,7 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 		}
 	}
 
-	const morseCliChannelLocalResponse = await morseCliChannel(interfaceName);
-	const morseCliStatsRemoteResponse = await remoteRangetestDevice.remoteRpc.morseCliStats(interfaceName);
-	const morseCliStatsLocalResponse = await morseCliStats(interfaceName);
-	const iwDumpRemoteResponse = await remoteRangetestDevice.remoteRpc.iwStationDump(interfaceName);
-	const iwDumpLocalResponse = await iwStationDump(interfaceName);
-
-	testResults['local']['morseCliChannel'] = morseCliChannelLocalResponse;
-	testResults['local']['morseCliStats'] = morseCliStatsLocalResponse;
-	testResults['remote']['morseCliStats'] = morseCliStatsRemoteResponse;
-	testResults['local']['iw'] = iwDumpLocalResponse['output'];
-	testResults['remote']['iw'] = iwDumpRemoteResponse['output'];
+	await collectStatistics(testResults, remoteRangetestDevice);
 
 	testProgressBar.complete('Test Complete');
 	saveLocalTest(testResults.id, testResults);
@@ -310,8 +382,8 @@ function parseResultsSummaryRowData(data) {
 	}
 
 	const bandwidth = data.local.morseCliChannel?.channel_op_bw;
-	const channel = data.local.iwinfo?.channel
-		? `${data.local.iwinfo.channel} (${data.local.iwinfo.frequency / 1e3} MHz)`
+	const channel = data.local.iwinfoInfo?.channel
+		? `${data.local.iwinfoInfo.channel} (${data.local.iwinfoInfo.frequency / 1e3} MHz)`
 		: undefined;
 
 	const parseThroughputValue = (value) => {
@@ -332,7 +404,7 @@ function parseResultsSummaryRowData(data) {
 	const udpThroughput = `${udpThroughputSend} / ${udpThroughputReceive}`;
 	const tcpThroughput = `${tcpThroughputSend} / ${tcpThroughputReceive}`;
 
-	const localSignalStrength = local?.iw?.match(/signal avg:\t(-?\d+)\s+dBm/)?.[1];
+	const localSignalStrength = data.local.iwinfoInfo?.signal;
 
 	return {
 		id: data.id,

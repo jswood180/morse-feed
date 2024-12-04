@@ -15,10 +15,11 @@
  *  - background_iperf3_server() => { id }
  *  - background_iperf3_client() => { id, udp, reverse }
  *  - background_iperf3_result( id ) => json_blob
- *  - iw_station_dump( interface ) => { output: ... }
- *  - morse_cli_stats_reset( interface ) => nothing
- *  - morse_cli_stats( interface ) => json_blob
- *  - morse_cli_channel( interface ) => json_blob
+ *  - iw_station_dump() => { interface_1: "...", interface_2: "..." }
+ *  - morse_cli_stats_reset() => nothing
+ *  - morse_cli_stats() => json_blob
+ *  - morse_cli_channel() => json_blob
+ *  - ip_link() => { interface_1: {...}, interface_2: {...} }
  */
 
 import * as ubus from 'ubus';
@@ -168,40 +169,89 @@ function execute_command(command) {
 	};
 }
 
-function iw_station_dump(req) {
-	const interface_name = req.args.interface;
-	const results = execute_command(`iw ${interface_name} station dump`);
-	if (results.exit_code == 0) {
-		return { output: results.output };
-	} else {
-		return { output: '' };
+function get_morse_devices() {
+	let devices = [];
+	const ls_entries = fs.lsdir('/sys/class/net/');
+	let ls_entry;
+	for (ls_entry in ls_entries) {
+		const morse_device_path = `/sys/class/net/${ls_entry}/device/morse`;
+		if (fs.access(morse_device_path, 'f')) {
+			push(devices, ls_entry);
+		}
 	}
+	return devices;
 }
+
+function iw_station_dump(req) {
+	const devices = get_morse_devices();
+	let output = {};
+	let device, results;
+	for (device in devices) {
+		results = execute_command(`iw ${device} station dump`);
+		if (results.exit_code == 0) {
+			output[device] = results.output;
+		} else {
+			output[device] = '';
+		}
+	}
+	return output;
+}
+
 
 function morse_cli_stats_reset(req) {
-	const interface_name = req.args.interface;
-	execute_command(`morse_cli -i ${interface_name} stats -r`);
-	return {};
+	const devices = get_morse_devices();
+	let device, results;
+	for (device in devices) {
+		results = execute_command(`morse_cli -i ${device} stats -r`);
+		if (results.exit_code == 0) { return {}; }
+	}
+	exit(ubus.STATUS_SYSTEM_ERROR);
 }
 
+/**
+ * Collect the first valid output of morse_cli stats.
+ * 
+ * Assumes that there is only ever 1 morse chip.
+ */
 function morse_cli_stats(req) {
-	const interface_name = req.args.interface;
-	const results = execute_command(`morse_cli -i ${interface_name} stats -j`);
-	if (results.exit_code == 0) {
-		return json(results.output);
-	} else {
-		return {};
+	const devices = get_morse_devices();
+	let device, results;
+	for (device in devices) {
+		results = execute_command(`morse_cli -i ${device} stats -j`);
+		if (results.exit_code == 0) { return json(results.output); }
 	}
+	exit(ubus.STATUS_SYSTEM_ERROR);
 }
 
+/**
+ * Collect the first valid output of morse_cli channel.
+ * 
+ * Assumes that there is only ever 1 morse chip.
+ */
 function morse_cli_channel(req) {
-	const interface_name = req.args.interface;
-	const results = execute_command(`morse_cli -i ${interface_name} channel -j`);
-	if (results.exit_code == 0) {
-		return json(results.output);
-	} else {
-		return {};
+	const devices = get_morse_devices();
+	let device, results;
+	for (device in devices) {
+		results = execute_command(`morse_cli -i ${device} channel -j`);
+		if (results.exit_code == 0) { return json(results.output); }
 	}
+	exit(ubus.STATUS_SYSTEM_ERROR);
+}
+
+function ip_link(req) {
+	const devices = get_morse_devices();
+	let output = {};
+	let device, results, json_results;
+	for (device in devices) {
+		results = execute_command(`ip -j -d link show ${device}`);
+		if (results.exit_code == 0) {
+			json_results = json(results.output);
+			output[device] = json_results[0];
+		} else {
+			output[device] = '';
+		}
+	}
+	return output;
 }
 
 return {
@@ -226,27 +276,18 @@ return {
 		},
 		iw_station_dump: {
 			call: iw_station_dump,
-			args: {
-				interface: 'wlan0',
-			},
 		},
 		morse_cli_stats_reset: {
 			call: morse_cli_stats_reset,
-			args: {
-				interface: 'wlan0',
-			},
 		},
 		morse_cli_stats: {
 			call: morse_cli_stats,
-			args: {
-				interface: 'wlan0',
-			},
 		},
 		morse_cli_channel: {
 			call: morse_cli_channel,
-			args: {
-				interface: 'wlan0',
-			},
+		},
+		ip_link: {
+			call: ip_link,
 		},
 	},
 };
