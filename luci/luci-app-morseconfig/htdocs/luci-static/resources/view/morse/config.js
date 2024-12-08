@@ -273,6 +273,7 @@ const WifiSecurityValue = form.Value.extend({
 
 	renderWidget(sectionId, optionIndex, cfgvalue) {
 		const encryption = this.section.formvalue(sectionId, 'encryption');
+
 		if (ENCRYPTION_MODES_USING_KEYS.has(encryption)) {
 			return form.Value.prototype.renderWidget.call(this, sectionId, optionIndex, cfgvalue);
 		} else if (!encryption || encryption === 'none') {
@@ -601,12 +602,29 @@ return view.extend({
 			option.value(k, v);
 		}
 		option.readonly = readOnly;
-		option.onchange = function (ev, sectionId) {
-			this.map.lookupOption('ssid', sectionId)[0].renderUpdate(sectionId);
-			// Clear key on change.
-			this.section.getUIElement(sectionId, '_wpa_key')?.setValue('');
+		option.onchange = function (ev, sectionId, value, previousValue) {
+			if (previousValue && previousValue.replace('-wds', '') === value.replace('-wds', '')) {
+				// If the only change is WDS, none of the dependent fields are invalidated.
+				return;
+			}
+
+			// Fundamental mode change; existing ssid/encryption/key are not relevant.
+
+			const ssidOption = this.map.lookupOption('ssid', sectionId)[0];
+			if (['sta', 'sta-wds'].includes(value)) {
+				ssidOption.renderUpdate(sectionId, '');
+			} else {
+				ssidOption.renderUpdate(sectionId, morseuci.getDefaultSSID());
+			}
+
 			const encryptionOption = this.map.lookupOption('encryption', sectionId)[0];
-			encryptionOption.renderUpdate(sectionId);
+			encryptionOption.renderUpdate(sectionId, isMorse ? 'sae' : 'psk2');
+
+			// Note that encryptionOption may have already called renderUpdate above,
+			// but it will not have reset the key appropriately if the encryption didn't change.
+			const newKey = ['sta', 'sta-wds'].includes(value) ? '' : morseuci.getDefaultWifiKey();
+			const keyOption = this.map.lookupOption('_wpa_key', sectionId)[0];
+			keyOption.renderUpdate(sectionId, newKey);
 		};
 		if (!isMorse) {
 			// Since we don't support WDS here, and in advanced config changing
@@ -673,7 +691,9 @@ return view.extend({
 		option = section.option(morseui.SSIDListScan, 'ssid', _('SSID/Mesh ID'));
 		if (this.hasQRCode && isMorse) {
 			option.depends('dpp', '0');
-			option.depends({ '!reverse': true, '!contains': true, 'mode': 'sta' });
+			option.depends({ '!reverse': true, 'mode': /sta|none/ });
+		} else {
+			option.depends({ '!reverse': true, 'mode': 'none' });
 		}
 		option.readonly = readOnly;
 		option.rmempty = false;
@@ -694,7 +714,6 @@ return view.extend({
 				encryptionElement.setValue(encryption);
 				encryptionElement.node.querySelector('select').dispatchEvent(new Event('change'));
 			}
-			this.section.getUIElement(sectionId, '_wpa_key')?.setValue('');
 		};
 
 		option.cfgvalue = function (section_id) {
@@ -725,8 +744,16 @@ return view.extend({
 		option.deviceType = deviceType;
 		option.default = 'none';
 		option.onchange = function (ev, sectionId, _value) {
+			const mode = this.section.formvalue(sectionId, 'mode');
+			let key = this.section.formvalue(sectionId, '_wpa_key');
+
+			// On change, if empty key 'suggest' default key.
+			if (!['sta', 'sta-wds'].includes(mode) && !key) {
+				key = morseuci.getDefaultWifiKey();
+			}
+
 			const keyOption = this.map.lookupOption('_wpa_key', sectionId)[0];
-			keyOption.renderUpdate(sectionId);
+			keyOption.renderUpdate(sectionId, key);
 		};
 
 		option = section.option(WifiSecurityValue, '_wpa_key', _('Key/Security'));
@@ -1108,8 +1135,8 @@ return view.extend({
 			}
 
 			const existingHandler = option.onchange;
-			option.onchange = async function (ev, sectionId, val) {
-				if (existingHandler) existingHandler.apply(this, [ev, sectionId, val]);
+			option.onchange = async function (ev, sectionId) {
+				if (existingHandler) existingHandler.apply(this, arguments);
 
 				// Usually, a parse is followed by a save and then options are
 				// reloaded. In our situation, we aren't using this mechanism,
