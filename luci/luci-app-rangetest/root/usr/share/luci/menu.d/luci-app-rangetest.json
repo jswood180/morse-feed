@@ -1,7 +1,7 @@
 {
-	"admin/network/rangetest": {
+	"admin/services/rangetest": {
 		"title": "Range Test",
-		"order": 51,
+		"order": 49,
 		"action": {
 			"type": "view",
 			"path": "rangetest/rangetest"
