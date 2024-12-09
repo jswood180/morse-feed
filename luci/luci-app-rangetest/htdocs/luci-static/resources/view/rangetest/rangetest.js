@@ -347,12 +347,15 @@ async function waitForIperf3Results(iperf3ClientId, duration, pollInterval, rema
 			testProgressBar.reset('Test Failed');
 			throw new Error(`Range test client has timed out`);
 		}
-		await new Promise(resolve => setTimeout(resolve, pollInterval * 1000));
-		clientPollResponse = await Promise.race([cancelPromise, getBackground(iperf3ClientId)]);
-		if (clientPollResponse === ui.CANCEL) {
+
+		let timeoutPromise = await Promise.race([cancelPromise, new Promise(resolve => setTimeout(resolve, pollInterval * 1000))]);
+		if (timeoutPromise === ui.CANCEL) {
 			testProgressBar.reset('Test Cancelled');
 			throw new Error('Test Cancelled');
-		} else if (Number.isInteger(clientPollResponse) && clientPollResponse !== 0) {
+		}
+
+		clientPollResponse = await getBackground(iperf3ClientId);
+		if (Number.isInteger(clientPollResponse) && clientPollResponse !== 0) {
 			throw new Error(`Request to local device failed with UBUS code: ${clientPollResponse}`);
 		} else if (Object.keys(clientPollResponse).length > 0) {
 			completed = true;
