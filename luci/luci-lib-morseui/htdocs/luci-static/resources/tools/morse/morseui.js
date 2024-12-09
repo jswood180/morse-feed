@@ -755,12 +755,18 @@ var CBISSIDListScan = form.Value.extend({
 		}
 	},
 
+	isNotRequired(sectionId) {
+		return ['monitor', 'none'].includes(this.section.formvalue(sectionId, 'mode'));
+	},
+
 	isStaMode(sectionId) {
 		return this.staOnly || ['sta', 'sta-wds'].includes(this.section.formvalue(sectionId, 'mode'));
 	},
 
 	renderWidget: function (sectionId, optionIndex, cfgvalue) {
-		if (this.isStaMode(sectionId)) {
+		if (this.isNotRequired(sectionId)) {
+			return E('input', { placeholder: 'Not required', disabled: 'true' });
+		} else if (this.isStaMode(sectionId)) {
 			return this.renderStaWidget(sectionId, optionIndex, cfgvalue);
 		} else {
 			this.clear();

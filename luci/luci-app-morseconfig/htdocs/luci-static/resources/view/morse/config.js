@@ -277,7 +277,7 @@ const WifiSecurityValue = form.Value.extend({
 		if (ENCRYPTION_MODES_USING_KEYS.has(encryption)) {
 			return form.Value.prototype.renderWidget.call(this, sectionId, optionIndex, cfgvalue);
 		} else if (!encryption || encryption === 'none') {
-			return '';
+			return E('input', { placeholder: 'Not required', disabled: 'true' });
 		} else {
 			return E('a', {
 				href: L.url('admin', 'network', 'wireless'),
@@ -691,9 +691,7 @@ return view.extend({
 		option = section.option(morseui.SSIDListScan, 'ssid', _('SSID/Mesh ID'));
 		if (this.hasQRCode && isMorse) {
 			option.depends('dpp', '0');
-			option.depends({ '!reverse': true, 'mode': /sta|none/ });
-		} else {
-			option.depends({ '!reverse': true, 'mode': 'none' });
+			option.depends({ '!reverse': true, 'mode': 'sta' });
 		}
 		option.readonly = readOnly;
 		option.rmempty = false;
