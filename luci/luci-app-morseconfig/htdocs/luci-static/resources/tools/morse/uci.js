@@ -489,7 +489,8 @@ function getEthernetPorts(builtinEthernetPorts, networkDevices) {
 	}
 
 	for (const device of networkDevices) {
-		if (device.getType() !== 'ethernet' || device.dev.type === 803) {
+		if (!['ethernet', 'vlan'].includes(device.getType()) || device.dev.type === 803) {
+			// Switch ports come up as vlan ports, so we leave vlan ports in for now.
 			// 803 is the morse monitor interface (usu morse0), which luci picks
 			// up as type ethernet (fallback).
 			continue;
