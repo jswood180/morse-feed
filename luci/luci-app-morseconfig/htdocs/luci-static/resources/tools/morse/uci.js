@@ -411,7 +411,7 @@ function ensureNetworkExists(sectionId, { local, primaryLocal } = {}) {
 	}
 
 	getOrCreateZone(sectionId);
-	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes('wan'));
+	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes(sectionId));
 
 	let umdnsNetworkList = L.toArray(uci.get_first('umdns', 'umdns', 'network'));
 	if (local) {
