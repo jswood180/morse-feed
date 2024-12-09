@@ -229,7 +229,7 @@ return wizard.AbstractWizardView.extend({
 
 				// Bridges
 				morseuci.useBridgeIfNeeded(upstreamNetwork);
-				morseuci.useBridgeIfNeeded('ahwlan');
+				morseuci.forceBridge('ahwlan', 'br-prpl', bridgeMAC);
 
 				uci.set('network', upstreamNetwork, 'proto', 'dhcp');
 				morseuci.setupNetworkWithDnsmasq('ahwlan', wlanIp);
