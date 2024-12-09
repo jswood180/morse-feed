@@ -40,7 +40,7 @@
   
     "admin/config": {
         "title": "Quick Config",
-        "order": 2,
+        "order": 5,
         "action": {
             "type": "view",
             "path": "morse/config"

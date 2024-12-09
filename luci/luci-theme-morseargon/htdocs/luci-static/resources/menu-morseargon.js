@@ -20,7 +20,7 @@ const callUciCommit = rpc.declare({
 
 // Items that appear in basic mode.
 const BASIC_MODE_MENU = new Set([
-	'Home', 'Quick Config', 'Wizards', 'Wizard', 'Help', 'Log out',
+	'Home', 'Wizards', 'Wizard', 'Upgrade', 'Help', 'Log out',
 ]);
 
 function slideUp(target, duration = 500, cb) {
