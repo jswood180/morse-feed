@@ -116,9 +116,14 @@ return baseclass.extend({
 
 		this.attachLanguageHandlers();
 
-		let uimode = localStorage.getItem('uimode');
-		if (!['normal', 'advanced'].includes(uimode)) {
-			uimode = 'normal';
+		let uimode;
+		if (window.advancedModeToggle) {
+			uimode = localStorage.getItem('uimode');
+			if (!['normal', 'advanced'].includes(uimode)) {
+				uimode = 'normal';
+			}
+		} else {
+			uimode = 'advanced';
 		}
 		document.body.classList.add(`uimode-${uimode}`);
 	},
@@ -236,7 +241,7 @@ return baseclass.extend({
 				menuClass += ' active';
 			}
 
-			if (l === 1 && !advancedModeRendered && !BASIC_MODE_MENU.has(children[i].title)) {
+			if (window.advancedModeToggle && l === 1 && !advancedModeRendered && !BASIC_MODE_MENU.has(children[i].title)) {
 				// The first time we see a non-basic mode element, add the advanced menu toggle
 				// (we don't want the advanced toggle to jump around as we add in the other items).
 				ul.appendChild(E('li', { 'style': 'display: block', 'data-title': 'Advanced' }, [

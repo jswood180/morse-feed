@@ -75,6 +75,8 @@
 		end
 	end
 
+	local advanced_mode_toggle = uci_cursor:get("luci", "main", "advancedmodetoggle") == "1";
+
 	local user_configured = uci_cursor:get("luci", "wizard", "used") ~= nil;
 	local virtual_wire = luci.sys.process.exec(
 		{"/sbin/persistent_vars_storage.sh", "READ", "mm_virtual_wire"},
@@ -108,6 +110,9 @@
 	<script src="<%=url('admin/translations', luci.i18n.context.lang)%><%# ?v=PKG_VERSION %>"></script>
 	<script src="<%=resource%>/luci.js"></script>
 	<script src="<%=resource%>/cbi.js"></script>
+	<script>
+		window.advancedModeToggle = <% if advanced_mode_toggle then %>true<% else %>false<% end %>;
+	</script>
 </head>
 
 <body
