@@ -160,7 +160,7 @@ function getDistanceBetweenDecimalDegreesCoordinates(lat1, lon1, lat2, lon2) {
 async function setupStatistics(testResults, remoteRangetestDevice) {
 	await Promise.all([
 		morseCliStatsReset(),
-		remoteRangetestDevice.remoteRpc.morseCliStatsReset(),
+		remoteRangetestDevice.morseCliStatsReset(),
 	]);
 }
 
@@ -198,11 +198,11 @@ async function collectStatistics(testResults, remoteRangetestDevice) {
 	] = await Promise.all([
 		morseCliChannel(),
 		morseCliStats(),
-		remoteRangetestDevice.remoteRpc.morseCliStats(),
+		remoteRangetestDevice.morseCliStats(),
 		iwStationDump(),
-		remoteRangetestDevice.remoteRpc.iwStationDump(),
+		remoteRangetestDevice.iwStationDump(),
 		ipLink(),
-		remoteRangetestDevice.remoteRpc.ipLink(),
+		remoteRangetestDevice.ipLink(),
 	]);
 
 	let localInterface, remoteInterface;
@@ -264,10 +264,10 @@ async function runRangetest(cancelPromise, configuration, testProgressBar) {
 		for (const direction of directions) {
 			testProgressBar.text = `${protocol.toUpperCase()} ${direction}`;
 
-			const iperf3RemoteResponse = await remoteRangetestDevice.remoteRpc.backgroundIperf3Server();
+			const iperf3RemoteResponse = await remoteRangetestDevice.backgroundIperf3Server();
 			const iperf3LocalResponse = await backgroundIperf3Client(remoteIp, (protocol === 'udp'), (direction === 'receive'), iperf3TestTime);
 			const iperf3LocalResults = await waitForIperf3Results(iperf3LocalResponse.id, iperf3TestTime, iperf3PollInterval, maxSubtestIncrements, percentPerIncrement, testProgressBar, cancelPromise);
-			const iperf3RemoteResults = await remoteRangetestDevice.remoteRpc.getBackground(iperf3RemoteResponse.id);
+			const iperf3RemoteResults = await remoteRangetestDevice.getBackground(iperf3RemoteResponse.id);
 
 			testResults['local']['iperf3'][protocol][direction]['end'] = iperf3LocalResults?.end;
 			testResults['remote']['iperf3'][protocol][direction]['end'] = iperf3RemoteResults?.end;

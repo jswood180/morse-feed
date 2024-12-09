@@ -182,20 +182,13 @@ var RemoteRpcClass = rpc.constructor.extend({
 	},
 });
 
-var remoteRpc = new RemoteRpcClass();
-
-var Remote = baseclass.extend({
-	remoteUrl: null,
-	remoteRpc: remoteRpc,
-	__init__: function (url, password) {
-		this.remoteUrl = 'http://' + url + '/ubus/';
-		remoteRpc.setBaseURL(this.remoteUrl);
-		remoteRpc.setPassword(password);
-	},
-});
-
 var RemoteDeviceFactory = baseclass.extend({
-	load: (url, password) => new Remote(url, password),
+	load: (url, password) => {
+		var remoteRpc = new RemoteRpcClass();
+		remoteRpc.setBaseURL('http://' + url + '/ubus/');
+		remoteRpc.setPassword(password);
+		return remoteRpc;
+	},
 });
 
 return RemoteDeviceFactory;
