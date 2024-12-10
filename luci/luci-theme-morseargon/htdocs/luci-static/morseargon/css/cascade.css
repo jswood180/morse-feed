@@ -2415,6 +2415,16 @@ body:not(.Interfaces) .cbi-rowstyle-2:first-child {
   display: none;
 }
 
+.cbi-dropdown.cbi-button-apply,
+.cbi-dropdown.cbi-button-negative {
+  min-height: 1.5em;
+}
+
+.cbi-dropdown.cbi-button-apply > ul,
+.cbi-dropdown.cbi-button-negative > ul {
+  line-height: 1.5em;
+}
+
 .cbi-button-apply > ul.preview {
   display: none;
 
