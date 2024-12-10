@@ -139,7 +139,10 @@ return view.extend({
 
 		// lan is the primary local interface unless overridden
 		// by wlan below if the network mode is set to bridged.
-		morseuci.ensureNetworkExists('lan', { local: true, primaryLocal: true });
+		wizard.setupNetworkIface('lan', { local: true, primaryLocal: true });
+		// Force wan even if not using to make sure that wan firewall rules are retained
+		// (resetUciNetworkTopology removes).
+		wizard.setupNetworkIface('wan');
 		morseuci.setupNetworkWithDnsmasq('lan', morseuci.getFirstIpaddr('lan') || DEFAULT_LAN_IP);
 
 		switch (this.data.wizard.device_mode) {
@@ -204,7 +207,7 @@ return view.extend({
 		switch (network_mode) {
 			case 'bridged': // move HaLow and wan to wlan; don't use wan at all
 				// Override lan with wlan as the primary local network.
-				morseuci.ensureNetworkExists('wlan', { local: true, primaryLocal: true });
+				wizard.setupNetworkIface('wlan', { local: true, primaryLocal: true });
 				uci.set('network', 'wlan', 'proto', 'dhcp');
 				morseuci.getOrCreateForwarding('lan', 'wlan');
 
@@ -229,7 +232,6 @@ return view.extend({
 				break;
 			case 'routed_wan': // everything on lan except wan port
 			default:
-				morseuci.ensureNetworkExists('wan');
 				uci.set('network', 'wan', 'proto', 'dhcp');
 				morseuci.getOrCreateForwarding('lan', 'wan');
 
@@ -245,7 +247,6 @@ return view.extend({
 				morseuci.setNetworkDevices('wan', ['wan']);
 				break;
 			case 'routed_wifi24': // everything on lan except 2.4 Wi-Fi STA; 'wan' disabled.
-				morseuci.ensureNetworkExists('wan');
 				uci.set('network', 'wan', 'proto', 'dhcp');
 				morseuci.getOrCreateForwarding('lan', 'wan');
 

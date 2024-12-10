@@ -121,8 +121,11 @@ return wizard.AbstractWizardView.extend({
 			wlanIp,
 		} = wizard.readSectionInfo();
 
-		morseuci.ensureNetworkExists('lan', { local: true });
-		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
+		wizard.setupNetworkIface('lan', { local: true });
+		wizard.setupNetworkIface('ahwlan', { local: true, primaryLocal: true });
+		// Force wan even if not using to make sure that wan firewall rules are retained
+		// (resetUciNetworkTopology removes).
+		wizard.setupNetworkIface('wan');
 
 		// Extract values then remove from dummy uci section.
 		const device_mode_meshgate = uci.get('network', 'wizard', 'device_mode_meshgate');
@@ -192,7 +195,6 @@ return wizard.AbstractWizardView.extend({
 				// Network
 				const upstreamNetwork = device_mode_meshgate === 'router_firewall' ? 'wan' : 'lan';
 				if (upstreamNetwork === 'wan') {
-					morseuci.ensureNetworkExists('wan');
 					morseuci.getOrCreateForwarding('ahwlan', 'wan');
 				} else {
 					morseuci.getOrCreateForwarding('ahwlan', 'lan', 'mmrouter');
@@ -234,7 +236,7 @@ return wizard.AbstractWizardView.extend({
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
-				morseuci.ensureNetworkExists('wifi24lan', { local: true });
+				wizard.setupNetworkIface('wifi24lan', { local: true });
 				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);

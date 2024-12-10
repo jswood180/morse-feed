@@ -138,8 +138,11 @@ return wizard.AbstractWizardView.extend({
 			uci.set('wireless', morseInterfaceName, 'auth_cache', '0');
 		};
 
-		morseuci.ensureNetworkExists('lan', { local: true });
-		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
+		wizard.setupNetworkIface('lan', { local: true });
+		wizard.setupNetworkIface('ahwlan', { local: true, primaryLocal: true });
+		// Force wan even if not using to make sure that wan firewall rules are retained
+		// (resetUciNetworkTopology removes).
+		wizard.setupNetworkIface('wan');
 
 		// Get bridge MAC for prplmesh.
 		// Find if the morseInterface has a valid MAC and use it with Morse OUI
@@ -208,7 +211,6 @@ return wizard.AbstractWizardView.extend({
 				const upstreamNetwork = this.getEthernetPorts().length > 1 ? 'wan' : 'lan';
 
 				if (upstreamNetwork === 'wan') {
-					morseuci.ensureNetworkExists('wan');
 					morseuci.getOrCreateForwarding('ahwlan', 'wan');
 				} else {
 					morseuci.getOrCreateForwarding('ahwlan', 'lan', 'mmrouter');
@@ -242,7 +244,7 @@ return wizard.AbstractWizardView.extend({
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
-				morseuci.ensureNetworkExists('wifi24lan', { local: true });
+				wizard.setupNetworkIface('wifi24lan', { local: true });
 				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
 				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);

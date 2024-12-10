@@ -172,6 +172,144 @@ function whitelistFields(conf, section, whitelist) {
 	}
 }
 
+/* Set default firewall rules for a non-local zone (i.e. if you're rejecting
+ * almost all traffic, these are the accept rules).
+ */
+function setDefaultWanFirewallRules(zone) {
+	/* These were auto-generated from the default firewall rules in 23.05,
+	 * extracted via # ubus call uci get '{"config":"firewall","type":"rule"}'
+	 *
+	 * for rule in x["values"].values():
+	 *   print(f"sid = uci.add('firewall', 'rule');")
+	 *   for k, v in rule.items():
+	 *     if not k.startswith('.'):
+	 *       if v == 'lan':
+	 *         v = '*'
+	 *       print(f"uci.set('firewall', sid, '{k}', {repr(v) if v != 'wan' else 'zone'});")
+	 *
+	 * All 'wan' references are changed to zone, and the IPSec rules are changed to
+	 * allow any destination zone instead of just lan (cf Allow-ICMPv6-Forward),
+	 * as this makes our setup independent of the other zones in the system.
+	 */
+	let sid;
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-DHCP-Renew');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'udp');
+	uci.set('firewall', sid, 'dest_port', '68');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	uci.set('firewall', sid, 'family', 'ipv4');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-Ping');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'icmp');
+	uci.set('firewall', sid, 'icmp_type', 'echo-request');
+	uci.set('firewall', sid, 'family', 'ipv4');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-IGMP');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'igmp');
+	uci.set('firewall', sid, 'family', 'ipv4');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-DHCPv6');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'udp');
+	uci.set('firewall', sid, 'dest_port', '546');
+	uci.set('firewall', sid, 'family', 'ipv6');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-MLD');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'icmp');
+	uci.set('firewall', sid, 'src_ip', 'fe80::/10');
+	uci.set('firewall', sid, 'icmp_type', ['130/0', '131/0', '132/0', '143/0']);
+	uci.set('firewall', sid, 'family', 'ipv6');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-ICMPv6-Input');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'proto', 'icmp');
+	uci.set('firewall', sid, 'icmp_type', ['echo-request', 'echo-reply', 'destination-unreachable', 'packet-too-big', 'time-exceeded', 'bad-header', 'unknown-header-type', 'router-solicitation', 'neighbour-solicitation', 'router-advertisement', 'neighbour-advertisement']);
+	uci.set('firewall', sid, 'limit', '1000/sec');
+	uci.set('firewall', sid, 'family', 'ipv6');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-ICMPv6-Forward');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'dest', '*');
+	uci.set('firewall', sid, 'proto', 'icmp');
+	uci.set('firewall', sid, 'icmp_type', ['echo-request', 'echo-reply', 'destination-unreachable', 'packet-too-big', 'time-exceeded', 'bad-header', 'unknown-header-type']);
+	uci.set('firewall', sid, 'limit', '1000/sec');
+	uci.set('firewall', sid, 'family', 'ipv6');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-IPSec-ESP');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'dest', '*');
+	uci.set('firewall', sid, 'proto', 'esp');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+	sid = uci.add('firewall', 'rule');
+	uci.set('firewall', sid, 'name', 'Allow-ISAKMP');
+	uci.set('firewall', sid, 'src', zone);
+	uci.set('firewall', sid, 'dest', '*');
+	uci.set('firewall', sid, 'dest_port', '500');
+	uci.set('firewall', sid, 'proto', 'udp');
+	uci.set('firewall', sid, 'target', 'ACCEPT');
+}
+
+/* Modify/add a network iface with the appropriate firewall zones/rules.
+ *
+ * Assumes that resetUciNetworkTopology has been called, as it does not
+ * check to see if the added firewall rules are already there.
+ *
+ * local: Add a 'local' network to specific configurations, similar to OpenWrt's 'lan'.
+ * It is a purely semantic label, indicating that no firewall/restrictions should be
+ * applied.
+ *
+ * primaryLocal: Identify the singular primary local network in specific configurations.
+ * It is currently only used to identify the interface for camera-onvif-server.
+ */
+function setupNetworkIface(sectionId, { local, primaryLocal } = {}) {
+	if (!uci.sections('network', 'interface').find(s => s['.name'] === sectionId)) {
+		uci.add('network', 'interface', sectionId);
+		// If we don't give the iface a proto the quick config page recognises,
+		// and it's never subsequently configured in the wizard,
+		// it won't show up there.
+		uci.set('network', sectionId, 'proto', 'dhcp');
+	}
+
+	morseuci.getOrCreateZone(sectionId);
+	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes(sectionId));
+
+	let umdnsNetworkList = L.toArray(uci.get_first('umdns', 'umdns', 'network'));
+	if (local) {
+		uci.set('firewall', zoneSection['.name'], 'input', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'forward', 'ACCEPT');
+
+		if (!umdnsNetworkList.includes(sectionId)) {
+			umdnsNetworkList.push(sectionId);
+			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList);
+		}
+	} else {
+		uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
+		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
+		uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
+
+		setDefaultWanFirewallRules(zoneSection.name);
+
+		if (umdnsNetworkList.includes(sectionId)) {
+			umdnsNetworkList = umdnsNetworkList.filter(n => n !== sectionId);
+			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList.length > 0 ? umdnsNetworkList : null);
+		}
+	}
+
+	if (primaryLocal) {
+		uci.set('camera-onvif-server', 'rpicamera', 'interface', sectionId);
+	}
+}
 /**
  * Remove any leftover disabled wifi ifaces (that aren't the default).
  *
@@ -283,6 +421,11 @@ function resetUciNetworkTopology() {
 	// Disable all forwarding.
 	for (const forwarding of uci.sections('firewall', 'forwarding')) {
 		uci.set('firewall', forwarding['.name'], 'enabled', '0');
+	}
+
+	// Remove all rules.
+	for (const rule of uci.sections('firewall', 'rule')) {
+		uci.remove('firewall', rule['.name']);
 	}
 
 	// Remove any masquerade/mtu_fix.
@@ -1015,5 +1158,6 @@ return baseclass.extend({
 	directUciRpc,
 	resetUci,
 	resetUciNetworkTopology,
+	setupNetworkIface,
 	WizardConfigError,
 });

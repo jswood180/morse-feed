@@ -393,52 +393,6 @@ function setupNetworkWithDnsmasq(sectionId, ip, uplink = true) {
 	}
 }
 
-/* Ensure that a specified network is fully configured within all relevant UCI sections.
- *
- * Always add a new uniquely named network section to the core network configuration
- * if it doesn't already exist.
- *
- * local: Add a 'local' network to specific configurations, similar to OpenWrt's 'lan'.
- * It is a purely semantic label, indicating that no firewall/restrictions should be
- * applied.
- *
- * primaryLocal: Identify the singular primary local network in specific configurations.
- * It is currently only used to identify the interface for camera-onvif-server.
- */
-function ensureNetworkExists(sectionId, { local, primaryLocal } = {}) {
-	if (!uci.sections('network', 'interface').find(s => s['.name'] === sectionId)) {
-		uci.add('network', 'interface', sectionId);
-	}
-
-	getOrCreateZone(sectionId);
-	const zoneSection = uci.sections('firewall', 'zone').find(z => L.toArray(z.network).includes(sectionId));
-
-	let umdnsNetworkList = L.toArray(uci.get_first('umdns', 'umdns', 'network'));
-	if (local) {
-		uci.set('firewall', zoneSection['.name'], 'input', 'ACCEPT');
-		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
-		uci.set('firewall', zoneSection['.name'], 'forward', 'ACCEPT');
-
-		if (!umdnsNetworkList.includes(sectionId)) {
-			umdnsNetworkList.push(sectionId);
-			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList);
-		}
-	} else {
-		uci.set('firewall', zoneSection['.name'], 'input', 'REJECT');
-		uci.set('firewall', zoneSection['.name'], 'output', 'ACCEPT');
-		uci.set('firewall', zoneSection['.name'], 'forward', 'REJECT');
-
-		if (umdnsNetworkList.includes(sectionId)) {
-			umdnsNetworkList = umdnsNetworkList.filter(n => n !== sectionId);
-			uci.set_first('umdns', 'umdns', 'network', umdnsNetworkList.length > 0 ? umdnsNetworkList : null);
-		}
-	}
-
-	if (primaryLocal) {
-		uci.set('camera-onvif-server', 'rpicamera', 'interface', sectionId);
-	}
-}
-
 /* Get the first ipaddr/netmask for an interface from UCI.
  *
  * uci supports multiple ip addresses in a somewhat confusing (bad?) way:
@@ -547,7 +501,6 @@ return baseclass.extend({
 	getNetworkWifiIfaces,
 	getOrCreateForwarding,
 	setupNetworkWithDnsmasq,
-	ensureNetworkExists,
 	getDefaultSSID,
 	getDefaultWifiKey,
 	getRandomMAC,

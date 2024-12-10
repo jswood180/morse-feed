@@ -86,8 +86,8 @@ return wizard.AbstractWizardView.extend({
 			morseInterfaceName,
 			lanIp,
 		} = wizard.readSectionInfo();
-		morseuci.ensureNetworkExists('lan', { local: true });
-		morseuci.ensureNetworkExists('ahwlan', { local: true, primaryLocal: true });
+		wizard.setupNetworkIface('lan', { local: true });
+		wizard.setupNetworkIface('ahwlan', { local: true, primaryLocal: true });
 
 		let device_mode_matter = uci.get('network', 'wizard', 'device_mode_matter');
 
