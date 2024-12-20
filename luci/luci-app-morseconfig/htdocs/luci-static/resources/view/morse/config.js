@@ -109,7 +109,7 @@ const ENCRYPTION_OPTIONS_FOR_MODE = {
 		none: ['none'],
 	},
 	morse: {
-		default: ['sae', 'owe', 'wpa3', 'none'],
+		default: ['sae', 'sae-mixed', 'owe', 'wpa3', 'none'],
 		mesh: ['sae', 'none'],
 		adhoc: ['none'],
 		monitor: ['none'],

@@ -114,8 +114,9 @@ return wizard.AbstractWizardView.extend({
 		};
 
 		const setMultiapWirelessConfig = () => {
-			// EasyMesh only supports SAE.
-			uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
+			// EasyMesh specifies that Fronthaul BSS must be configured
+			// as PSK+SAE (WPA3 transition mode).
+			uci.set('wireless', morseInterfaceName, 'encryption', 'sae-mixed');
 			uci.set('wireless', morseInterfaceName, 'mode', 'ap');
 			uci.set('wireless', morseInterfaceName, 'wds', '1');
 			uci.set('wireless', morseInterfaceName, 'bss_transition', '1');
