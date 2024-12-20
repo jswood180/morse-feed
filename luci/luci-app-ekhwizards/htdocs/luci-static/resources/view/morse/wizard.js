@@ -339,7 +339,7 @@ return wizard.AbstractWizardView.extend({
 		page.enableDiagram({
 			extras: ['AP_SELECT_FILL', 'STA_SELECT_FILL'],
 			blacklist: ['AP_HALOW_INT',
-			            'AP_MGMT_ETH', 'AP_UPLINK', 'AP_UPLINK_ETH', 'AP_UPLINK_WIFI24', 'AP_WIFI_24',
+			            'AP_MGMT_ETH', 'AP_UPLINK', 'AP_UPLINK_ETH', 'AP_UPLINK_WIFI24', 'AP_WIFI24',
 			            'STA_HALOW', 'STA_WIFI24', 'MESH_HALOW', 'STA_MGMT_ETH'],
 		});
 
@@ -369,7 +369,7 @@ return wizard.AbstractWizardView.extend({
 				distinct channels and a lower bandwidth to reduce interference.`));
 		page.enableDiagram({
 			extras: ['AP_HALOW_INT_SELECT', 'AP_HALOW_INT_SELECT_FILL'],
-			blacklist: ['AP_MGMT_ETH', 'AP_UPLINK', 'AP_UPLINK_ETH', 'AP_UPLINK_WIFI24', 'AP_WIFI_24',
+			blacklist: ['AP_MGMT_ETH', 'AP_UPLINK', 'AP_UPLINK_ETH', 'AP_UPLINK_WIFI24', 'AP_WIFI24',
 			            'STA_HALOW_INT', 'AP_HALOW_INT:IP', 'AP_HALOW_INT:IPMethod'],
 		});
 
