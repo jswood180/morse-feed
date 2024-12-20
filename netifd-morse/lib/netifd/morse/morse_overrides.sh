@@ -15,7 +15,7 @@ morse_wpa_supplicant_prepare_interface() {
 	json_get_vars sae_pwe multi_ap
 	json_get_values sae_group_list sae_group
 
-	[ "${multi_ap:=0}" -lt 1 ] && set_default sae_pwe 1
+	set_default sae_pwe 1
 
 	local pmf=
 	[ "${multi_ap:=0}" -eq 1 ] && pmf=2
@@ -318,6 +318,10 @@ morse_override_hostapd_set_bss_options() {
 	[ "$wps_pushbutton" -gt 0 ] && append config_methods push_button
 	[ "$wps_label" -gt 0 ] && append config_methods label
 	[ "$wps_virtual_push_button" -gt 0 ] && append config_methods virtual_push_button
+
+	# Enable SAE (WPA3-Personal transition mode) automatically for
+	# WPA2-PSK credentials received using WPS.
+	[ "$wps_virtual_push_button" -gt 0 ] && append bss_conf "wps_cred_add_sae=1" "$N"
 
 	# WPS not possible on Multi-AP backhaul-only SSID
 	[ "$multi_ap" = 1 ] && wps_possible=
@@ -1117,6 +1121,7 @@ morse_override_wpa_supplicant_add_network() {
 
 	if [ "$multi_ap" -eq 1 ]; then
 		echo "wps_priority=1" >> "$_config"
+		echo "wps_cred_add_sae=1" >> "$_config"
 		echo "update_config=1"  >> "$_config"
 		#Adding obtained wps network credentials here to make it persistent
 		append network_data "proto=RSN" "$N$T"
