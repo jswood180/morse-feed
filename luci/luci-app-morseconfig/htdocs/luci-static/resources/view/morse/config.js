@@ -277,7 +277,12 @@ const WifiSecurityValue = form.Value.extend({
 		if (ENCRYPTION_MODES_USING_KEYS.has(encryption)) {
 			return form.Value.prototype.renderWidget.call(this, sectionId, optionIndex, cfgvalue);
 		} else if (!encryption || encryption === 'none') {
-			return E('input', { placeholder: 'Not required', disabled: 'true' });
+			const widget = new ui.Textfield('', {
+				id: this.cbid(sectionId),
+				placeholder: 'Not required',
+				disabled: true,
+			});
+			return widget.render();
 		} else {
 			return E('a', {
 				href: L.url('admin', 'network', 'wireless'),
@@ -307,6 +312,10 @@ function isNormalNetworkIface(netIface) {
 
 function getWifiIfaceModeI18n(wifiIface) {
 	return WIFI_MODE_NAMES[wifiIface.mode] ?? _('Unknown');
+}
+
+function modeUsesDefaultWifiKey(mode) {
+	return ['ap', 'ap-wds', 'mesh'].includes(mode);
 }
 
 return view.extend({
@@ -617,15 +626,17 @@ return view.extend({
 				ssidOption.renderUpdate(sectionId, morseuci.getDefaultSSID());
 			}
 
-			const encryptionOption = this.map.lookupOption('encryption', sectionId)[0];
-			encryptionOption.renderUpdate(sectionId, isMorse ? 'sae' : 'psk2');
-
-			// Note that encryptionOption may have already called renderUpdate above,
-			// but it will not have reset the key appropriately if the encryption didn't change.
-			const newKey = ['sta', 'sta-wds'].includes(value) ? '' : morseuci.getDefaultWifiKey();
+			const newKey = modeUsesDefaultWifiKey(value) ? morseuci.getDefaultWifiKey() : '';
 			const keyOption = this.map.lookupOption('_wpa_key', sectionId)[0];
 			keyOption.renderUpdate(sectionId, newKey);
+
+			// Note: The encryptionOption should be updated AFTER the keyOption, otherwise the
+			// encryptionOption will undo the keyOption change above if the changing mode also
+			// changes the encryption setting
+			const encryptionOption = this.map.lookupOption('encryption', sectionId)[0];
+			encryptionOption.renderUpdate(sectionId, isMorse ? 'sae' : 'psk2');
 		};
+
 		if (!isMorse) {
 			// Since we don't support WDS here, and in advanced config changing
 			// the mode would let you select the WDS status (similar to our HaLow
@@ -746,7 +757,7 @@ return view.extend({
 			let key = this.section.formvalue(sectionId, '_wpa_key');
 
 			// On change, if empty key 'suggest' default key.
-			if (!['sta', 'sta-wds'].includes(mode) && !key) {
+			if (!key && modeUsesDefaultWifiKey(mode)) {
 				key = morseuci.getDefaultWifiKey();
 			}
 
