@@ -298,11 +298,8 @@ function apply_config (uci, config) {
 		uci.set("wireless", backhaul_sta, "key", config.key);
 		uci.set("wireless", backhaul_sta, "multi_ap", "1");
 		uci.set("wireless", backhaul_sta, "wds", "1");
-		// TODO: we probably should do this, but...
-		// uci.set("wireless", backhaul_sta, "sae_pwe", "1");
-		// uci.set("wireless", backhaul_sta, "encryption", config.encryption);
-		// ...this makes it the same as our WPS thing.
-		uci.set("wireless", backhaul_sta, "encryption", "psk");
+		uci.set("wireless", backhaul_sta, "sae_pwe", "1");
+		uci.set("wireless", backhaul_sta, "encryption", config.encryption);
 		uci.set("wireless", backhaul_sta, "ifname", "wlan-prpl-1");
 		// Use backhaul link for showing halow info, since that's the one
 		// most likely to indicate that it's working (and traffic from AP

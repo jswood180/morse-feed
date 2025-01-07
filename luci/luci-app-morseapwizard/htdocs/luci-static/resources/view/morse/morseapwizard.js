@@ -150,6 +150,7 @@ return view.extend({
 			case 'standard':
 				morseuci.forceBridge('lan', 'br-lan');
 				uci.set('system', 'led_halow', 'dev', 'wlan0');
+				uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
 				break;
 			case 'prplmesh':
 				morseuci.forceBridge('lan', 'br-prpl', this.bridgeMAC);
@@ -165,7 +166,7 @@ return view.extend({
 				}
 				uci.set('prplmesh', morseDeviceName, 'hostap_iface', 'wlan-prpl');
 
-				uci.set('wireless', morseInterfaceName, 'encryption', 'sae');
+				uci.set('wireless', morseInterfaceName, 'encryption', 'sae-mixed');
 				uci.set('wireless', morseInterfaceName, 'bss_transition', '1');
 				uci.set('wireless', morseInterfaceName, 'multi_ap', '3');
 				uci.set('wireless', morseInterfaceName, 'ieee80211k', '1');
