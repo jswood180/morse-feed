@@ -26,7 +26,7 @@
 
 'use strict';
 
-/* globals configDiagram dom firewall form fs morseui network poll prplmeshTopology rpc ui uci view */
+/* globals configDiagram dom firewall form fs morseuci morseui network poll prplmeshTopology rpc ui uci view */
 'require dom';
 'require firewall';
 'require form';
@@ -39,6 +39,7 @@
 'require poll';
 'require view.home.prplmesh-topology as prplmeshTopology';
 'require custom-elements.morse-config-diagram as configDiagram';
+'require tools.morse.uci as morseuci';
 'require tools.morse.morseui as morseui';
 'require view.morse.wpsbuttonelement';
 
@@ -1077,7 +1078,7 @@ return view.extend({
 	},
 
 	async repeatLoad() {
-		const [boardinfo, ethernetPorts, morseMode, dhcpLeases] = await Promise.all([
+		const [boardinfo, builtinEthernetPorts, morseMode, dhcpLeases] = await Promise.all([
 			callSystemBoard(),
 			callGetBuiltinEthernetPorts(),
 			callMorseModeQuery(),
@@ -1120,7 +1121,7 @@ return view.extend({
 			network.flushCache(true),
 		]);
 
-		return { boardinfo, ethernetPorts, morseMode, dhcpLeases };
+		return { boardinfo, builtinEthernetPorts, morseMode, dhcpLeases };
 	},
 
 	async render([onceLoadData, repeatLoadData]) {
@@ -1182,7 +1183,7 @@ return view.extend({
 		return E('div');
 	},
 
-	async createCards({ hasQRCode, boardinfo, ethernetPorts, morseMode, dhcpLeases }) {
+	async createCards({ hasQRCode, boardinfo, builtinEthernetPorts, morseMode, dhcpLeases }) {
 		// Turn list into obj with getName() as keys.
 		function makeObj(l) {
 			return l.reduce((o, d) => (o[d.getName()] = d, o), {});
@@ -1191,6 +1192,7 @@ return view.extend({
 		// NB All of these awaits are not going to cause actual network requests,
 		// because (confusingly) network.flushCache(true) not only flushes the cache
 		// but makes all these requests again.
+		const networkDevices = await network.getDevices();
 		const hostHints = await network.getHostHints();
 		const networks = await network.getNetworks();
 		const wifiDevices = makeObj(await network.getWifiDevices());
@@ -1257,7 +1259,7 @@ return view.extend({
 		// List non-HaLow APs later
 		cards.push(...nonHaLowCards);
 
-		cards.push(createModeCard(morseMode, ethernetPorts));
+		cards.push(createModeCard(morseMode, morseuci.getEthernetPorts(builtinEthernetPorts, networkDevices)));
 		cards.push(createNetworkInterfacesCard(networks, wifiDevices));
 		cards.push(createSystemCard(boardinfo));
 
