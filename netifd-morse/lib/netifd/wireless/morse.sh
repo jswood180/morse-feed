@@ -159,11 +159,11 @@ apply_thin_lmac_optimization() {
 	sysctl -w net.ipv4.neigh.default.gc_thresh1=2048
 	sysctl -w net.ipv4.neigh.default.gc_thresh2=2048
 	sysctl -w net.ipv4.neigh.default.gc_thresh3=2048
-    # Increase ARP table entry timeout
-    sysctl -w net.ipv4.neigh.default.base_reachable_time_ms=3600000
-    # Disable Unnecessary ARP responses
-    sysctl -w net.ipv4.conf.all.arp_ignore=1
-    sysctl -w net.ipv4.conf.all.arp_announce=2
+	# Increase ARP table entry timeout
+	sysctl -w net.ipv4.neigh.default.base_reachable_time_ms=3600000
+	# Disable Unnecessary ARP responses
+	sysctl -w net.ipv4.conf.all.arp_ignore=1
+	sysctl -w net.ipv4.conf.all.arp_announce=2
 	# Increase the number of connections supported per second from 470 - see:
 	# https://stackoverflow.com/questions/410616/increasing-the-maximum-number-of-tcp-ip-connections-in-linux
 	sysctl -w net.ipv4.ip_local_port_range="32768 65535"
@@ -852,16 +852,16 @@ morse_setup_adhoc() {
 
 morse_setup_monitor() {
 	local iface_index=$1
-    halow_bw=
+	halow_bw=
 	center_freq=
-    _get_regulatory NA "$country" "$channel" "$op_class"
-    if [ $? -ne 0 ]; then
-        echo "Couldn't find reg for NA in $country with ch=$channel op=$op_class" >&2
-        return
-    fi
-    #multiply the center_freq by 1000 and remove the decimal part
-    center_freq=$(echo "$center_freq * 1000" | bc | awk '{printf "%g\n", $0}')
-    morse_cli -i $ifname channel -c $center_freq ${halow_bw:+-o $halow_bw} ${s1g_prim_chwidth:+-p $(( s1g_prim_chwidth + 1 ))} ${s1g_prim_1mhz_chan_index:+-n $s1g_prim_1mhz_chan_index}
+	_get_regulatory NA "$country" "$channel" "$op_class"
+	if [ $? -ne 0 ]; then
+		echo "Couldn't find reg for NA in $country with ch=$channel op=$op_class" >&2
+		return
+	fi
+	#multiply the center_freq by 1000 and remove the decimal part
+	center_freq=$(echo "$center_freq * 1000" | bc | awk '{printf "%g\n", $0}')
+	morse_cli -i $ifname channel -c $center_freq ${halow_bw:+-o $halow_bw} ${s1g_prim_chwidth:+-p $(( s1g_prim_chwidth + 1 ))} ${s1g_prim_1mhz_chan_index:+-n $s1g_prim_1mhz_chan_index}
 
 	[ -n "$failed" ] || wireless_add_vif "$iface_index" "$ifname"
 	uci -q -P /var/state set wireless._${phy}.umlist="${ifname}"
