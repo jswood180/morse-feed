@@ -614,7 +614,7 @@ return wizard.AbstractWizardView.extend({
 			option.scanAlerts = true;
 			option.rmempty = false;
 			option.retain = true;
-			option.scanEncryptions = ['psk2', 'psk', 'sae', 'none'];
+			option.scanEncryptions = ['psk2', 'psk', 'sae', 'owe', 'none'];
 			option.onchangeWithEncryption = function (ev, sectionId, value, encryption) {
 				thisWizardView.onchangeOptionUpdateDiagram(this);
 				this.section.getUIElement(sectionId, 'uplink_encryption').setValue(encryption);
@@ -630,8 +630,9 @@ return wizard.AbstractWizardView.extend({
 			option.ucioption = 'encryption';
 			option.depends('network.wizard.uplink', 'wifi');
 			option.value('psk2', _('WPA2-PSK'));
-			option.value('psk', _('WPA-PSK'));
 			option.value('sae', _('WPA3-SAE'));
+			option.value('psk', _('WPA-PSK'));
+			option.value('owe', _('OWE'));
 			option.value('none', _('None'));
 
 			option = page.option(form.Value, 'uplink_key', _('Passphrase'));
