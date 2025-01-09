@@ -618,7 +618,7 @@ return wizard.AbstractWizardView.extend({
 
 			option = page.option(form.ListValue, 'encryption', _('Encryption'));
 			option.value('psk2', _('WPA2-PSK'));
-			option.value('psk', _('WPA-PSK'));
+			option.value('sae-mixed', _('WPA2-PSK/WPA3-SAE Mixed Mode'));
 			option.value('sae', _('WPA3-SAE'));
 			option.depends('disabled', '0');
 		}
