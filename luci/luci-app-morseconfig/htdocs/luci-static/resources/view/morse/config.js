@@ -77,14 +77,14 @@ const HALOW_WIFI_MODE_NAMES = {
 // These are extracted from LuCI's view/network/wireless.js.
 const ENCRYPTION_OPTIONS = {
 	'psk2': 'WPA2-PSK',
-	'psk-mixed': 'WPA-PSK/WPA2-PSK Mixed Mode',
+	'psk-mixed': 'WPA-PSK/WPA2-PSK',
 	'psk': 'WPA-PSK',
 	'sae': 'WPA3-SAE',
-	'sae-mixed': 'WPA2-PSK/WPA3-SAE Mixed Mode',
+	'sae-mixed': 'WPA2-PSK/WPA3-SAE',
 	'wep-open': _('WEP Open System'),
 	'wep-shared': _('WEP Shared Key'),
 	'wpa3': 'WPA3-EAP',
-	'wpa3-mixed': 'WPA2-EAP/WPA3-EAP Mixed Mode',
+	'wpa3-mixed': 'WPA2-EAP/WPA3-EAP',
 	'wpa2': 'WPA2-EAP',
 	'wpa': 'WPA-EAP',
 	'owe': 'OWE',
@@ -102,7 +102,7 @@ const ENCRYPTION_MODES_USING_KEYS = new Set([
 
 const ENCRYPTION_OPTIONS_FOR_MODE = {
 	mac80211: {
-		default: ['psk2', 'psk', 'sae', 'wpa3', 'none'],
+		default: ['psk2', 'sae-mixed', 'sae', 'owe', 'wpa3', 'none'],
 		mesh: ['sae', 'none'],
 		adhoc: ['psk2', 'none'],
 		monitor: ['none'],
@@ -276,7 +276,7 @@ const WifiSecurityValue = form.Value.extend({
 
 		if (ENCRYPTION_MODES_USING_KEYS.has(encryption)) {
 			return form.Value.prototype.renderWidget.call(this, sectionId, optionIndex, cfgvalue);
-		} else if (!encryption || encryption === 'none') {
+		} else if (!encryption || ['none', 'owe'].includes(encryption)) {
 			const widget = new ui.Textfield('', {
 				id: this.cbid(sectionId),
 				placeholder: 'Not required',
