@@ -68,7 +68,6 @@ _change_device_defaults() {
 
 				uci batch <<- END
 					set wireless.default_$config.ssid='$default_ssid'
-					set wireless.default_$config.mesh_id='$default_ssid'
 					set wireless.default_$config.key='$default_wifi_key'
 					set wireless.default_$config.encryption='sae'
 				END
@@ -85,7 +84,6 @@ _change_device_defaults() {
 					delete wireless.$config.disabled
 					set wireless.$config.country='$mm_region'
 					set wireless.default_$config.ssid='$default_ssid'
-					set wireless.default_$config.mesh_id='$default_ssid'
 					set wireless.default_$config.key='$default_wifi_key'
 					set wireless.default_$config.encryption='psk2'
 				END

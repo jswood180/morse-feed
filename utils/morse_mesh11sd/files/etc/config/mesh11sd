@@ -24,5 +24,3 @@ config mesh11sd 'mesh_beaconless'
 
 config mesh11sd 'mesh_dynamic_peering'
         option enabled '0'
-        option mesh_rssi_margin '5'
-        option mesh_blacklist_timeout '60'
