@@ -734,7 +734,13 @@ function createAssoclistCard(wifiNetwork, hostHints, hasQRCode) {
 	const bitrate = wifiNetwork.getBitRate();
 	const wifiName = getWifiName(wifiNetwork);
 
-	const associatedDevices = wifiNetwork.assoclist.map(d => ({
+	const associatedDevices = wifiNetwork.assoclist.filter(
+		// 80211s mesh devices show up in this list when they are not fully
+		// connected, for example if they have the wrong credentials. This is
+		// only intended to filter out that case. For other modes the station
+		// does not show in the list at all if it has the wrong credentials.
+		d => d.authorized,
+	).map(d => ({
 		mac: d.mac,
 		hostname: hostHints.getHostnameByMACAddr(d.mac),
 		ip: hostHints.getIPAddrByMACAddr(d.mac),
