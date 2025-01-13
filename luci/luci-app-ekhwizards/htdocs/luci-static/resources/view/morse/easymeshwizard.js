@@ -245,11 +245,11 @@ return wizard.AbstractWizardView.extend({
 			} else if (uplink === 'wifi') {
 				const iface = bridgeMode();
 
-				wizard.setupNetworkIface('wifi24lan', { local: true });
-				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
-				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
+				wizard.setupNetworkIface('lan', { local: true });
+				uci.set('network', 'lan', 'proto', 'dhcp');
+				uci.set('wireless', wifiStaInterfaceName, 'network', 'lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);
-				morseuci.getOrCreateForwarding(iface, 'wifi24lan', 'wifi24forward');
+				morseuci.getOrCreateForwarding(iface, 'lan', 'mmrouter');
 			}
 		} else {
 			if (device_mode_meshagent === 'extender') { // i.e. router

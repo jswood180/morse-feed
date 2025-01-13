@@ -220,17 +220,15 @@ return wizard.AbstractWizardView.extend({
 
 				uci.set('network', iface, 'proto', 'dhcp');
 			} else if (uplink === 'wifi') {
-				// Confusingly, this is 'bridgeMode' even though
-				// we forward between interfaces
-				// (since we put both ethernet+halow on lan
-				// but the wifi uplink is separate)
+				// Confusingly, this is 'bridgeMode' even though we forward between interfaces
+				// (as we put both ethernet/halow on ahwlan).
 				const iface = bridgeMode();
 
-				wizard.setupNetworkIface('wifi24lan', { local: true });
-				uci.set('network', 'wifi24lan', 'proto', 'dhcp');
-				uci.set('wireless', wifiStaInterfaceName, 'network', 'wifi24lan');
+				wizard.setupNetworkIface('lan', { local: true });
+				uci.set('network', 'lan', 'proto', 'dhcp');
+				uci.set('wireless', wifiStaInterfaceName, 'network', 'lan');
 				morseuci.setupNetworkWithDnsmasq(iface, wlanIp);
-				morseuci.getOrCreateForwarding(iface, 'wifi24lan', 'wifi24forward');
+				morseuci.getOrCreateForwarding(iface, 'lan', 'mmrouter');
 			}
 		} else if (mode === 'sta') {
 			if (device_mode_sta === 'extender') { // i.e. router
