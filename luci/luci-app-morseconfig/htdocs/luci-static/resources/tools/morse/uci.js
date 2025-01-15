@@ -110,7 +110,7 @@ function getOrCreateZone(networkSectionId) {
 	// NB It's not necessary to name the zone here, but I think it makes things clearer.
 	uci.add('firewall', 'zone', proposedName);
 	uci.set('firewall', proposedName, 'name', proposedName);
-	uci.set('firewall', proposedName, 'network', networkSectionId);
+	uci.set('firewall', proposedName, 'network', [networkSectionId]);
 	uci.set('firewall', proposedName, 'input', 'ACCEPT');
 	uci.set('firewall', proposedName, 'output', 'ACCEPT');
 	uci.set('firewall', proposedName, 'forward', 'ACCEPT');
