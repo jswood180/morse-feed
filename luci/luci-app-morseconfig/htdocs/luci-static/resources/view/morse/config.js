@@ -705,6 +705,14 @@ return view.extend({
 			option.depends({ '!reverse': true, 'mode': 'sta' });
 		}
 		option.readonly = readOnly;
+		if (readOnly) {
+			// If we're in readonly mode, we don't want to block people saving seemingly
+			// 'bad' configurations when they can't fix them.
+			// This happens in practice if you have an EasyMesh config before WPS,
+			// where we don't know the SSID/password yet (and so have left it blank).
+			option.validate = () => true;
+			option.optional = true;
+		}
 		option.rmempty = false;
 		option.write = function (sectionId, value) {
 			const mode = this.map.lookupOption('mode', sectionId)[0].formvalue(sectionId);
@@ -774,6 +782,14 @@ return view.extend({
 		option.rmempty = true;
 		option.password = true;
 		option.readonly = readOnly;
+		if (readOnly) {
+			// If we're in readonly mode, we don't want to block people saving seemingly
+			// 'bad' configurations when they can't fix them.
+			// This happens in practice if you have an EasyMesh config before WPS,
+			// where we don't know the SSID/password yet (and so have left it blank).
+			option.validate = () => true;
+			option.optional = true;
+		}
 
 		// This curious code is taken from LuCI's wireless.js. Apparently,
 		// in WEP mode key can be an reference specifying key1/key2/key3/key4.
