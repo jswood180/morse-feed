@@ -129,6 +129,7 @@ const MORSE_MODES = {
 	'sta-extender': _('HaLow Extender'),
 	'mesh-router': _('HaLow 11s Mesh Router'),
 	'mesh-extender': _('HaLow 11s Mesh Extender'),
+	'mesh-gate': _('HaLow 11s Mesh Gate'),
 	'ap-easymesh': _('HaLow EasyMesh Controller'),
 	'sta-easymesh': _('HaLow EasyMesh Agent'),
 	'sta-matter': _('Matter'),
