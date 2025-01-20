@@ -460,6 +460,7 @@ return view.extend({
 		this.renderNetworkInterfaces(networkMap, hasWireless);
 
 		const easyMesh = uci.get('prplmesh', 'config', 'enable');
+		const isPrplMeshAgent = (easyMesh == '1' && (uci.get('prplmesh', 'config', 'management_mode') === 'Multi-AP-Agent'));
 
 		let wirelessMap = null;
 		if (hasWireless) {
@@ -482,16 +483,28 @@ return view.extend({
 
 				this.renderWifiDevice(wirelessMap, device);
 				if (device.type === 'morse' && easyMesh == '1') {
-					const alert_message_section = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
-					alert_message_section.anonymous = true;
-					alert_message_section.render = function () {
+					const alertMsgSection = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
+					alertMsgSection.anonymous = true;
+					alertMsgSection.render = function () {
 						return E('div', { class: 'alert-message warning' }, _(`
 							The following section is read-only in EasyMesh mode. Any direct modifications made on this page might disrupt normal functionality. To make changes, please use the <a target="_blank" href="%s">wizard</a>.
 						`).format(L.url('admin', 'selectwizard')));
 					};
 					this.renderWifiInterfaces(wirelessMap, device['.name'], { readOnly: true });
 				} else {
-					this.renderWifiInterfaces(wirelessMap, device['.name']);
+					// Make the 2.4GHz radio creds read only in extender and include QR code warning.
+					if (isPrplMeshAgent) {
+						const alertMsgSection = wirelessMap.section(form.TypedSection, 'EasyMesh_Info', _('EasyMesh Alert Message'));
+						alertMsgSection.anonymous = true;
+
+						// TODO: Nice to have : APP-4022 Have a redirect link to Halow gateway's IP.
+						alertMsgSection.render = function () {
+							return E('div', { class: 'alert-message warning' }, _(`
+								The following section is read-only in EasyMesh agent mode. To make changes use HaLow Gateway GUI. 
+								Extender's QR code for connecting to the Wi-Fi network is no longer valid.`));
+						};
+					}
+					this.renderWifiInterfaces(wirelessMap, device['.name'], { readOnly: isPrplMeshAgent });
 				}
 			}
 		}
