@@ -137,7 +137,11 @@ EOF
 			morse,ekh01-mf15457)
 				bcf=bcf_mf15457_v2.bin
 			;;
-
+			*)
+				if [[ $path  = *usb* ]]; then
+					bcf=bcf_mf15457_v2.bin
+				fi
+			;;
 		esac
 
 		[ -n "${bcf}" ] && uci -q set wireless.radio${devidx}.bcf="${bcf}"
