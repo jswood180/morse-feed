@@ -3,7 +3,9 @@
 # Copyright (C) 2021-2022 Morse Micro Pty Ltd. All rights reserved.
 #
 
-START=01
+# After boot for overlay mount, (and log).
+# Before wpad and network.
+START=15
 
 boot() {
     /sbin/antenna-select 2
