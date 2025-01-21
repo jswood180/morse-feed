@@ -129,6 +129,8 @@ const BRIDGED_HALOW_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client without 
 const BRIDGED_WIFI_STA_ERROR = _('Network "%s" has a Wi-Fi client on the same network as other devices. Either remove the other devices or remove it from the network.');
 const BRIDGED_WIFI_ADHOC_ERROR = _('Network "%s" has an Ad-Hoc Wi-Fi interface on the same network as other devices. Either remove the other devices or remove it from the network.');
 
+const NETWORK_WITHOUT_DEVICES_INFO = _('This network interface is unused because it has no Wireless interfaces or Ethernet ports. You can add Ethernet ports using the Ethernet column, or add Wireless interfaces by configuring them in the section below.');
+
 // This is based on widgets.NetworkSelect, but uses the zone style colouring
 // rather than the attached devices icons.
 const SimpleNetworkSelect = form.ListValue.extend({
@@ -851,10 +853,21 @@ return view.extend({
 
 		let option;
 
-		option = section.option(form.DummyValue, '_name', _('Name'));
+		option = section.option(morseui.DynamicDummyValue, '_name', _('Name'));
 		option.rawhtml = true;
 		option.cfgvalue = (sectionId) => {
-			return E('span', { class: 'zonebadge network-name', style: firewall.getZoneColorStyle(morseuci.getZoneForNetwork(sectionId)) }, sectionId);
+			if (morseuci.getNetworkDevices(sectionId).length + morseuci.getNetworkWifiIfaces(sectionId).length > 0) {
+				return E('span', {
+					class: 'zonebadge network-name',
+					style: firewall.getZoneColorStyle(morseuci.getZoneForNetwork(sectionId)),
+				}, sectionId);
+			} else {
+				return E('span', {
+					'class': 'zonebadge network-name show-warning',
+					'data-tooltip': NETWORK_WITHOUT_DEVICES_INFO,
+					'style': firewall.getZoneColorStyle(morseuci.getZoneForNetwork(sectionId)),
+				}, sectionId);
+			}
 		};
 
 		option = section.option(SimpleForwardSelect, '_forward', _('Forward'));
