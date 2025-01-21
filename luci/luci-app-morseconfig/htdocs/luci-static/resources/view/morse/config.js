@@ -1214,6 +1214,26 @@ return view.extend({
 
 				this.cfgvalue(sectionId, this.load(sectionId));
 
+				// Now it gets even trickier. Sometimes, it's not valid to set an option
+				// because it's already been 'used' in another section (e.g. assigning the
+				// same ethernet port to two networks, or the same IP to two networks).
+				// This prevents _either_ of those values from parsing.
+				// However, when one of them is updated, both should now be pushed through
+				// to uci before we can update dynamic dummy values or the diagram.
+				for (const otherSectionId of this.section.cfgsections()) {
+					if (otherSectionId !== sectionId) {
+						try {
+							await this.parse(otherSectionId);
+						} catch (e) {
+							// Ignore errors from fields we aren't changing and
+							// in this case continue to update diagram/dummyvalues.
+						}
+					}
+				}
+
+				// Now we get to what all this is for: the ability to re-render things when
+				// something has changed. In this case, special form elements
+				// (DynamicDummyValues) and the diagram at the top.
 				for (const dv of dynamicValues) {
 					for (const dvSectionId of dv.section.cfgsections()) {
 						dv.renderUpdate(dvSectionId);
