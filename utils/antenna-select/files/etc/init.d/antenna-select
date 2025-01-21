@@ -8,5 +8,9 @@
 START=15
 
 boot() {
+    . /lib/functions.sh
+    if [[ "$(board_name)" = morse,ekh04* ]]; then
+        return
+    fi
     /sbin/antenna-select 2
 }
