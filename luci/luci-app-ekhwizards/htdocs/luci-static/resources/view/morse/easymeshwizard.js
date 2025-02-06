@@ -160,7 +160,7 @@ return wizard.AbstractWizardView.extend({
 				uci.set('wireless', wifiApInterfaceName, 'auth_cache', '0');
 				uci.set('wireless', wifiApInterfaceName, 'network', 'ahwlan');
 			}
-		}
+		};
 
 		wizard.setupNetworkIface('lan', { local: true });
 		wizard.setupNetworkIface('ahwlan', { local: true, primaryLocal: true });
@@ -182,7 +182,7 @@ return wizard.AbstractWizardView.extend({
 		const uplink = uci.get('network', 'wizard', 'uplink');
 
 		const isWifiAp = wifiDeviceName && uci.get('wireless', wifiApInterfaceName, 'disabled') !== '1';
-		const isWifiApBridgedWithHalow = ( isWifiAp && uci.get('network', 'wizard', 'bridge_with_halow') !== '0');
+		const isWifiApBridgedWithHalow = (isWifiAp && uci.get('network', 'wizard', 'bridge_with_halow') !== '0');
 
 		if (wifiDeviceName) {
 			// We don't have an explicit option for this, but it's determined by uplink.
@@ -605,7 +605,7 @@ return wizard.AbstractWizardView.extend({
 
 		if (wifiDeviceName) {
 			page = this.page(wifiApInterfaceSection,
-				_('2.4 GHz Wi-Fi Access Point'), wifiApInfo );
+				_('2.4 GHz Wi-Fi Access Point'), wifiApInfo);
 			page.enableDiagram({
 				extras: ['STA_WIFI24_INT_SELECT', 'STA_WIFI24_INT_SELECT_FILL', 'AP_WIFI24_INT_SELECT', 'AP_WIFI24_INT_SELECT_FILL'],
 			});
@@ -625,13 +625,13 @@ return wizard.AbstractWizardView.extend({
 			option.enabled = '1';
 			option.disabled = '0';
 			option.default = '1';
-			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0' , ['network.wizard.uplink'] :'none' });
-			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0' , ['network.wizard.device_mode_meshagent'] :'none' });
-			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0' , ['network.wizard.device_mode_meshagent'] :'extender' });
+			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0', ['network.wizard.uplink']: 'none' });
+			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0', ['network.wizard.device_mode_meshagent']: 'none' });
+			option.depends({ [`wireless.${wifiApInterfaceName}.disabled`]: '0', ['network.wizard.device_mode_meshagent']: 'extender' });
 
 			option.onchange = function (ev, sectionId, value) {
 				let fullMessage = `${wifiApInfo} ${easyMeshManagedAP}`;
-				this.page.updateInfoText( value === '0' ? fullMessage : wifiApInfo, thisWizardView);
+				this.page.updateInfoText(value === '0' ? fullMessage : wifiApInfo, thisWizardView);
 				thisWizardView.onchangeOptionUpdateDiagram(this);
 			};
 

@@ -490,8 +490,8 @@ function resetUciNetworkTopology() {
 	}
 
 	// Remove mesh-managed APs from prplmesh config
-	for(const prpl_device of uci.sections('prplmesh', 'wifi-device')) {
-		uci.remove('prplmesh' , prpl_device['.name']);
+	for (const prpl_device of uci.sections('prplmesh', 'wifi-device')) {
+		uci.remove('prplmesh', prpl_device['.name']);
 	}
 }
 
