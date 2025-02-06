@@ -135,11 +135,11 @@ EOF
 				bcf=bcf_mf13455.bin
 			;;
 			morse,ekh01-mf15457)
-				bcf=bcf_mf15457_v2.bin
+				bcf=bcf_mf15457.bin
 			;;
 			*)
 				if [[ $path  = *usb* ]]; then
-					bcf=bcf_mf15457_v2.bin
+					bcf=bcf_mf15457.bin
 				fi
 			;;
 		esac
