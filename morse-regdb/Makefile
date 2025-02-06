@@ -19,7 +19,9 @@ PKG_RELEASE:=1
 PKG_BUILD_DEPENDS:=python3/host
 
 PKG_SOURCE_VERSION:=v2.2.1
-PKG_SOURCE_URL:=https://github.com/MorseMicro/morse_regdb.git
+# This points to an internal repo, but the repo is not used unless REGENERATE is set
+# (see initial comment).
+PKG_SOURCE_URL:=ssh://git@bitbucket.org/morsemicro/morse_regdb.git
 PKG_SOURCE_PROTO:=git
 PKG_MIRROR_HASH:=39f04ac799341e7a07d256c89ad8d30e22848f28af211a2a313bf9a16e5a6311
 
@@ -59,7 +61,7 @@ define Package/morse-regdb/config
 		depends on PACKAGE_morse-regdb
 		help
 			Filter out channels from regulatory database.
-			Enter a list channels separated by |.
+			Enter a list of channels separated by |.
 			Leave blank to include all channels.
 			This only filters the channels.csv file, which affects the choices
 			available in the UI but does not otherwise limit the capabilities
