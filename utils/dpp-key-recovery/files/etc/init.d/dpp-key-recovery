@@ -1,0 +1,70 @@
+#!/bin/sh /etc/rc.common
+#
+# Copyright (C) 2021-2023 Morse Micro Pty Ltd. All rights reserved.
+#
+. /lib/netifd/morse/morse_utils.sh
+
+START=11
+
+# update_dpp_private_key compares the recovered dpp_key (if exist) with the one
+# in /etc/dpp_key.pem and will overwrite it if they are different. 
+update_dpp_private_key()
+{
+	local tmp_key_path=$1
+	local etc_key_path=$2
+
+	# /tmp/key exist , /etc/key DOESN'T exist
+	if [ -f "$tmp_key_path" ] && [ ! -f "$etc_key_path" ]; then
+		#copy /tmp/key to /etc/key; return
+		cp $tmp_key_path $etc_key_path
+		return
+	fi
+
+
+	# /tmp/key DOESN'T exist , /etc/key DOESN'T exist
+	if [ ! -f "$tmp_key_path" ] && [ ! -f "$etc_key_path" ]; then
+		#generate a key and save it to /etc/key; return
+		openssl ecparam -genkey -name prime256v1 -noout -out $etc_key_path
+		return
+	fi
+
+
+	# /tmp/key DOESN'T exist , /etc/key exist
+	if [ ! -f "$tmp_key_path" ] && [ -f "$etc_key_path" ]; then
+		return
+	fi
+
+	# /tmp/key exist , /etc/key exist
+	if [ -f "$tmp_key_path" ] && [ -f "$etc_key_path" ]; then
+		#are they different?		
+		local md5sum_tmp_key=$(md5sum $tmp_key_path | awk '{ print $1 }')
+		local md5sum_etc_key=$(md5sum $etc_key_path | awk '{ print $1 }')
+		if [ ! "$md5sum_tmp_key" = "$md5sum_etc_key" ]; then
+			#yes
+			#copy /tmp/key to /etc/key; return
+			cp $tmp_key_path $etc_key_path
+			return
+		else
+			#no
+			return
+		fi
+	fi
+
+}
+
+boot() {
+    /morse/scripts/recover_dpp_key.sh /tmp/dpp_key.pem
+    update_dpp_private_key /tmp/dpp_key.pem /etc/dpp_key.pem
+
+	local halow_mac="$(morse_get_chip_macaddr)"
+	if [ -z "$halow_mac" ]; then
+		local ETH0_MAC_SUFFIX="$(cat /sys/class/net/eth0/address | cut -d: -f4-)"
+		halow_mac="0C:BF:74:$ETH0_MAC_SUFFIX"
+	fi
+
+	if [ -n "$halow_mac" ]; then
+		update_dpp_qrcode /etc/dpp_key.pem "$halow_mac"
+	else
+		logger "Unable to get macaddr of the halow interface. Skipping QR code string generation"
+	fi
+}
