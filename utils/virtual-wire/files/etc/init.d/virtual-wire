@@ -1,0 +1,136 @@
+#!/bin/sh /etc/rc.common
+# Copyright 2023 Morse Micro
+# Reconfigures the device as either a halow station or access point depending on
+# the state of a GPIO jumper.
+
+. /lib/functions.sh
+
+# We can run after uci-defaults are applied by boot (10)
+# But before network (20) and after log (12)
+START=19
+
+_start_wifi_device() {
+	# Enable the morse wifi-device and disable anything else
+	local section_name="$1"
+	local dcs_name="${section_name}_dcs"
+	if [ "$(config_get "$section_name" type)" = "morse" ]; then
+		uci batch <<- END
+			set wireless.$dcs_name=dcs
+			set wireless.$dcs_name.algorithm='ewma'
+			set wireless.$section_name.dcs='1'
+			set wireless.$section_name.disabled=0
+		END
+		# Set the region if we have one and none is already set
+		if [ -n "$region" ] && [ -z "$(config_get "$section_name" country)" ]; then
+			uci set "wireless.$section_name.country=$region"
+		fi
+		# Start on the highest bandwidth channel for the country code. netifd
+		# does fill a channel automatically, but it may be for the wrong region.
+		# Channels can be queried from iwinfo or the driver, but not if the
+		# device is down, and the device is not up until we have a valid channel.
+		local country=$(uci -q get wireless."$section_name".country)
+		if [ -n "$country" ]; then
+			local channel="$(awk < /usr/share/morse-regdb/channels.csv -F, '$1 == "'"$country"'" {print $2, $3}' \
+				| sort -n | awk 'END {print $2}')"
+			logger -t virtual-wire -p daemon.notice "setting channel $channel for $country"
+			if [ -n "$channel" ]; then
+				uci set "wireless.$section_name.channel=$channel"
+			fi
+		fi
+		_wifi_device_name="$section_name"
+	else
+		uci set wireless."$section_name".disabled=1
+	fi
+}
+
+_start_wifi_iface() {
+	# Disable all other wifi-iface sections and configure default_radio* for the morse device
+	local section_name="$1"
+	if [[ "$section_name" == default* ]] &&
+		[ "$(config_get "$section_name" device)" = "$_wifi_device_name" ]; then
+		local ssid="mmvw-$(tr -cd A-Z < /dev/urandom | head -c 6)"
+		local key="$(tr -cd A-Za-z0-9 < /dev/urandom | head -c 20)"
+		uci batch <<- END
+			delete "wireless.$section_name"
+			set wireless.$section_name=wifi-iface
+			set wireless.$section_name.device='$_wifi_device_name'
+			set wireless.$section_name.encryption='sae'
+			set wireless.$section_name.max_inactivity='300'
+			set wireless.$section_name.dtim_period='1'
+			set wireless.$section_name.ieee80211w='2'
+			set wireless.$section_name.dpp='0'
+			set wireless.$section_name.network='lan'
+			set wireless.$section_name.wds='1'
+			set wireless.$section_name.ssid='$ssid'
+			set wireless.$section_name.key='$key'
+			set wireless.$section_name.mode='sta'
+		END
+		_wifi_iface_name="$section_name"
+	else
+		uci set wireless."$section_name".disabled=1
+	fi
+}
+
+_set_wifi_iface_mode() {
+	section_name=$(uci -q get wireless.data.virtual_wire)
+	if [ -n "$section_name" ]; then
+		uci set "wireless.$section_name.mode=$1"
+	fi
+}
+
+start() {
+	# virtual wire mode configures the device with halow and ethernet bridged and
+	# a static ip address. smart_manager DCS is used to choose the best channel. The
+	# ssid and SAE key are randomly generated. DPP push button is used to pair
+	# the devices. The configuration is written once only, except that the
+	# jumper can be used to switch a device between AP and station.
+
+	# We only continue if virtual wire is explicitly enabled in the persistent config.
+	vw_enabled=$(persistent_vars_storage.sh READ mm_virtual_wire)
+	if [ $? -ne 0 ] || [ "$vw_enabled" != "1" ]; then
+		return 0
+	fi
+
+	# wizard.js and configpage.js both create luci.wizard.used. We use that as
+	# an indication that the user has reconfigured their device and therefore
+	# this script should not proceed. This won't catch configuration made by
+	# Network --> Wireless or manual uci commands.
+	# if this logic is changed the banner logic in header.htm also needs to change.
+	if uci -q get luci.wizard.used &> /dev/null ; then
+		return 0
+	fi
+
+	local device_mode=ap
+	local ip_addr=10.42.1.1
+	val=$(cat /sys/class/gpio/morse-mode-switch/value)
+	if [ "$val" = 1 ]; then
+		device_mode=sta
+		ip_addr=10.42.1.2
+	fi
+	logger -t virtual-wire -p daemon.notice \
+		"Configuring device as virtual wire with mode=$device_mode"
+
+	# wireless.data.virtual_wire holds the configured wifi-iface name.
+	# And we use it to check if we've already configured this device.
+	if ! uci get wireless.data.virtual_wire &> /dev/null; then
+		region=$(/morse/scripts/persistent_vars_storage.sh READ mm_region)
+
+		config_load wireless
+		config_foreach _start_wifi_device wifi-device
+		config_foreach _start_wifi_iface wifi-iface
+
+		# Set lan IP and disable the dhcp server.
+		uci batch <<- END
+			set network.lan.ipaddr=$ip_addr
+			set dhcp.@dnsmasq[0].localuse=0
+			set dhcp.@dnsmasq[0].port=0
+			set dhcp.@dnsmasq[0].nonwildcard=1
+			set dhcp.@dnsmasq[0].interface=lo
+			set dhcp.@dnsmasq[0].resolvfile=/dev/null
+			set wireless.data.virtual_wire=$_wifi_iface_name
+		END
+	fi
+
+	_set_wifi_iface_mode "$device_mode"
+	uci commit
+}
