@@ -1,0 +1,67 @@
+From eabda6db495e0493ea71cb5b25e1c600a2002f1e Mon Sep 17 00:00:00 2001
+From: Nev Young <neville.young@morsemicro.com>
+Date: Thu, 29 Aug 2024 22:47:41 +0000
+Subject: [PATCH] Merged in
+ SW-12601-add-retries-for-the-health-check-command-before-resetting-the-chip
+ (pull request #1278)
+
+Retry the health check command once in the health monitor before resetting the chip
+
+Approved-by: Andrew Pope
+Approved-by: Adam Baumann
+Approved-by: Sagar Bussa
+Approved-by: Ria Thomas
+Approved-by: James Herbert
+Approved-by: Josh Wilkinson
+---
+ command.c | 2 +-
+ mac.c     | 8 +++++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/command.c b/command.c
+index 9f285ac0..d73fe7a4 100644
+--- a/command.c
++++ b/command.c
+@@ -33,7 +33,7 @@
+  */
+ #define MM_CMD_DEFAULT_TIMEOUT_MS 600
+ #define MM_CMD_POWERSAVE_TIMEOUT_MS 2000
+-#define MM_CMD_HEALTH_CHECK_TIMEOUT_MS 2000
++#define MM_CMD_HEALTH_CHECK_TIMEOUT_MS 1000
+ 
+ enum morse_interface_type {
+ 	MORSE_INTERFACE_TYPE_INVALID = 0,
+diff --git a/mac.c b/mac.c
+index 8b985752..2ce6fa8b 100644
+--- a/mac.c
++++ b/mac.c
+@@ -95,6 +95,8 @@
+ #define MORSE_ECSA_WARN(_m, _f, _a...)		morse_warn(FEATURE_ID_ECSA, _m, _f, ##_a)
+ #define MORSE_ECSA_ERR(_m, _f, _a...)		morse_err(FEATURE_ID_ECSA, _m, _f, ##_a)
+ 
++#define MORSE_HEALTH_CHECK_RETRIES 1
++
+ enum dot11ah_powersave_mode {
+ 	POWERSAVE_MODE_DISABLED = 0x00,
+ 	POWERSAVE_MODE_PROTOCOL_ENABLED = 0x01,
+@@ -6092,12 +6094,16 @@ static void morse_mac_restart_work(struct work_struct *work)
+ static void morse_health_check_work(struct work_struct *work)
+ {
+ 	int ret;
++	int retries = 0;
+ 	struct morse *mors = container_of(work, struct morse, health_check);
+ 
+ 	if (!mors->started)
+ 		return;
+ 
+-	ret = morse_cmd_health_check(mors);
++	do {
++		ret = morse_cmd_health_check(mors);
++	} while (ret && retries++ < MORSE_HEALTH_CHECK_RETRIES);
++
+ 	if (ret) {
+ 		MORSE_ERR(mors, "%s: Failed health check (errno=%d)\n", __func__, ret);
+ 
+-- 
+2.25.1
+
