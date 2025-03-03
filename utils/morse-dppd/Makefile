@@ -10,13 +10,12 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=morse-dppd
 PKG_RELEASE:=1
 
-PKG_VERSION:=1.12.4
+PKG_VERSION:=1.14.1
 
 PKG_SOURCE_VERSION:=$(PKG_VERSION)
 PKG_SOURCE_URL:=https://github.com/MorseMicro/dpp-daemon.git
-PKG_MIRROR_HASH:=fd2011465ab94d22575189b943ca285d6be96ae7e0b5e204fb8d18d1277fbf6e
 PKG_SOURCE_PROTO:=git
-PKG_HASH:=dd8b39752a632f052ec6706661a93bb4e9d3a8f22a1bad5355ee71fe1996b680
+PKG_HASH:=e3151c07d9a87f1812fe83ccff54078f91fe31d58b5c8b432f41bca0f43e25b4
 
 MAKE_PATH:=daemon
 
@@ -57,12 +56,15 @@ TARGET_CFLAGS += \
 -DCONFIG_IPV6 \
 -DNEED_AP_MLME
 
+# Add CFLAGS to suppress warnings about the usage of deprecated OpenSSL APIs.
+TARGET_CFLAGS += -Wno-deprecated-declarations
+
 define Package/morse-dppd
   SECTION:=Utilities
   CATEGORY:=Utilities
   TITLE:=MorseMicro 802.11ah DPP Daemon
   MAINTAINER:=Morse Micro
-  DEPENDS:=dppd-creds +libnl +libnl-genl +libopenssl +libncurses +libmicrohttpd-ssl +avahi-utils
+  DEPENDS:=dppd-creds +libnl +libnl-genl +libopenssl +libncurses +libmicrohttpd-ssl +avahi-utils +libwpa_client_s1g
 endef
 
 define Package/morse-dppd/description
@@ -72,7 +74,7 @@ endef
 define Package/morse-dppd/install
 	$(INSTALL_DIR) $(1)/usr/bin/
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(MAKE_PATH)/build/dppd $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(MAKE_PATH)/build/$(ARCH)/dppd $(1)/usr/bin/
 	$(INSTALL_BIN) ./files/etc/init.d/dppd $(1)/etc/init.d/
 endef
 

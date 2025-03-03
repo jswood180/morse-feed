@@ -13,11 +13,11 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=morse-board-config
 PKG_RELEASE=6
 
-PKG_VERSION:=rel_1_12_4_2024_Jun_11
+PKG_VERSION:=rel_1_14_1_2024_Dec_05
 
-PKG_SOURCE:=morsemicro-bcf-rel_1_12_4_2024_Jun_11.tar
-PKG_SOURCE_URL:=https://github.com/MorseMicro/bcf_binaries/releases/download/v1.12.4/
-PKG_HASH:=e403764730aa149e78874135da154bab2a24574308d3f2df88c9b4c125766ae3
+PKG_SOURCE:=morsemicro-bcf-rel_1_14_1_2024_Dec_05.tar
+PKG_SOURCE_URL:=https://github.com/MorseMicro/bcf_binaries/releases/download/v1.14.1/
+PKG_HASH:=ea90cfa1b7d6111c681bde013e51f88d54274548704ffdf14f6ddaa555150144
 
 PKG_MAINTAINER:=Morse Micro <info@morsemicro.com>
 PKG_BUILD_PARALLEL:=1

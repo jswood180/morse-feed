@@ -10,13 +10,13 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=wpa_supplicant_s1g
 PKG_RELEASE=2
 
-PKG_VERSION:=1.12.4
+PKG_VERSION:=1.14.1
 
 PKG_LICENSE:=BSD-3-Clause
 
 PKG_SOURCE_VERSION:=$(PKG_VERSION)
 PKG_SOURCE_URL:=https://github.com/MorseMicro/hostap.git
-PKG_HASH:=c342d1489d03363b79b5b4e185ccbceca53aab9e634daefb81180ad1012b77b7
+PKG_HASH:=5ad24b655857051690dcab437377efbdfcfeb82c185dc7e36b3bc905554b3da8
 PKG_SOURCE_PROTO:=git
 
 PKG_MAINTAINER:=Morse Micro <info@morsemicro.com>
@@ -25,7 +25,7 @@ PKG_BUILD_PARALLEL:=1
 include $(INCLUDE_DIR)/package.mk
 
 MAKE_FLAGS += \
-	MORSEWPA_SUPPLICANT_VERSION_STRING=$(PKG_VERSION)
+	MORSE_VERSION=$(PKG_VERSION)
 
 # Add support for simple background scan
 MMWPA_SUPPLICANT_CONFIG_SET = \
@@ -64,6 +64,8 @@ MMWPA_SUPPLICANT_CONFIG_ENABLE = \
 	CONFIG_IBSS_RSN \
 	CONFIG_OWE \
 	CONFIG_DPP \
+	CONFIG_DPP2 \
+	CONFIG_DPP3 \
 	CONFIG_SAE \
 	CONFIG_SAE_PK \
 	CONFIG_TESTING_OPTIONS \
@@ -108,15 +110,15 @@ define Package/wpa_supplicant_s1g
   PROVIDES:=wpa_supplicant_s1g
 endef
 
-define Package/libwpa_client
+define Package/libwpa_client_s1g
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=WirelessAPD
-  TITLE:=libwpa_client
+  TITLE:=libwpa_client_s1g
   DEPENDS:=wpa_supplicant_s1g
 endef
 
-define Package/libwpa_client/description
+define Package/libwpa_client_s1g/description
   wpa_supplicant_s1g client library
 endef
 
@@ -143,6 +145,8 @@ TARGET_CPPFLAGS := \
 	-DCONFIG_LIBNL20 \
 	-D_GNU_SOURCE
 
+TARGET_CFLAGS += -Wno-deprecated-declarations
+
 TARGET_LDFLAGS += -lnl-3 -lnl-genl-3 -lnl-route-3
 TARGET_LDFLAGS += -lm -lpthread -lcrypto -lssl
 ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_DBUS),y)
@@ -151,7 +155,7 @@ endif
 
 define Build/RunMake
 	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" \
-	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR)/$(1) \
+	$(MAKE) $(MAKE_FLAGS) $(PKG_JOBS) -C $(PKG_BUILD_DIR)/$(1) \
 		$(TARGET_CONFIGURE_OPTS) \
 		$(DRIVER_MAKEOPTS) \
 		LIBS="$(TARGET_LDFLAGS)" \
@@ -165,7 +169,7 @@ define Build/Compile
 	+$(call Build/RunMake,wpa_supplicant, \
 		wpa_supplicant_s1g wpa_cli_s1g \
 	)
-	+$(call Build/RunMake,wpa_supplicant, libwpa_client.so)
+	+$(call Build/RunMake,wpa_supplicant, libwpa_client_s1g.so)
 endef
 
 define Package/wpa_supplicant_s1g/install
@@ -179,17 +183,17 @@ ifeq ($(CONFIG_MORSE_WPA_SUPPLICANT_S1G_DBUS),y)
 endif
 endef
 
-define Package/libwpa_client/install
+define Package/libwpa_client_s1g/install
 	$(INSTALL_DIR) $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/libwpa_client.so $(1)/usr/lib/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wpa_supplicant/libwpa_client_s1g.so $(1)/usr/lib/
 endef
 
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/
 	$(INSTALL_DIR) $(1)/usr/include/
-	$(CP) $(PKG_BUILD_DIR)/wpa_supplicant/libwpa_client.so		$(1)/usr/lib/
+	$(CP) $(PKG_BUILD_DIR)/wpa_supplicant/libwpa_client_s1g.so		$(1)/usr/lib/
 	$(CP) $(PKG_BUILD_DIR)/src/common/wpa_ctrl.h				$(1)/usr/include/wpa_ctrl.h
 endef
 
 $(eval $(call BuildPackage,wpa_supplicant_s1g))
-$(eval $(call BuildPackage,libwpa_client))
+$(eval $(call BuildPackage,libwpa_client_s1g))
