@@ -5,17 +5,16 @@ backported version mismatches causing compiler errors.
 
 --- a/mac.c
 +++ b/mac.c
-@@ -925,6 +925,13 @@ void morse_mac_fill_tx_info(struct morse *mors,
+@@ -947,12 +947,7 @@ void morse_mac_fill_tx_info(struct morse
  
  		if (info->flags & IEEE80211_TX_STATUS_EOSP)
  			tx_info->flags |= cpu_to_le32(MORSE_TX_CONF_FLAGS_IMMEDIATE_REPORT);
-+	} else if (ieee80211_is_mgmt(hdr->frame_control) && !ieee80211_is_bufferable_mmpdu(skb)) {
-+		/*
-+		 * Note, this does not handle the special IBSS case where probe responses
-+		 * to unicast probe requests should be buffered. That will need to be added
-+		 * if power save support for IBSS is added.
-+		 */
-+		tx_info->flags |= cpu_to_le32(MORSE_TX_CONF_NO_PS_BUFFER);
- 	}
- 
- 	if (info->control.hw_key) {
+-#if KERNEL_VERSION(6, 6, 0) > LINUX_VERSION_CODE
+-	} else if (ieee80211_is_mgmt(hdr->frame_control) &&
+-		   !ieee80211_is_bufferable_mmpdu(hdr->frame_control)) {
+-#else
+ 	} else if (ieee80211_is_mgmt(hdr->frame_control) && !ieee80211_is_bufferable_mmpdu(skb)) {
+-#endif
+ 		/*
+ 		 * Note, this does not handle the special IBSS case where probe responses
+ 		 * to unicast probe requests should be buffered. That will need to be added

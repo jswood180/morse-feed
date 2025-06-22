@@ -13,11 +13,11 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=morse-fw
 PKG_RELEASE=2
 
-PKG_VERSION:=rel_1_14_1_2024_Dec_05
+PKG_VERSION:=rel_1_15_3_2025_Apr_16
 
-PKG_SOURCE:=morsemicro-fw-rel_1_14_1_2024_Dec_05.tar
-PKG_SOURCE_URL:=https://github.com/MorseMicro/firmware_binaries/releases/download/v1.14.1/
-PKG_HASH:=56e7cd3ec6a5f1321b9be3d3551c965b7762d4f180fa415a38a365ddb2f43cd1
+PKG_SOURCE:= morsemicro-fw-rel_1_15_3_2025_Apr_16.tar
+PKG_SOURCE_URL:=https://github.com/MorseMicro/firmware_binaries/releases/download/v1.15.3/
+PKG_HASH:=de7e3e9f1b7b97aff9d63687c4d3e99fe2544fcfc7e5567df1ab0da194656469
 
 PKG_MAINTAINER:=Morse Micro <info@morsemicro.com>
 PKG_BUILD_PARALLEL:=1
